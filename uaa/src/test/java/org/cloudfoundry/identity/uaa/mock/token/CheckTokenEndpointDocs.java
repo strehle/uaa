@@ -64,7 +64,7 @@ public class CheckTokenEndpointDocs extends InjectedMockContextTest {
 
         Snippet requestParameters = requestParameters(
             parameterWithName("token").description("The token").attributes(key("constraints").value("Required"), key("type").value(STRING)),
-            parameterWithName("scopes").description("Comma-separated string of scopes to check if scopes are present on the token").attributes(key("constraints").value("Optional"), key("type").value(ARRAY))
+            parameterWithName("scopes").description("String of comma-separated scopes, for checking presence of scopes on the token").attributes(key("constraints").value("Optional"), key("type").value(ARRAY))
         );
 
         Snippet responseFields = responseFields(
@@ -74,7 +74,7 @@ public class CheckTokenEndpointDocs extends InjectedMockContextTest {
             fieldWithPath("client_id").description("A unique string representing the registration information provided by the client"),
             fieldWithPath("exp").description("[Expiration Time](https://tools.ietf.org/html/rfc7519#section-4.1.4) Claim"),
             fieldWithPath("authorities").type(ARRAY).description("Only applicable for client tokens").optional(),
-            fieldWithPath("scope").description("Comma-delimited list of scopes authorized by the user for this client"),
+            fieldWithPath("scope").description("List of scopes authorized by the user for this client"),
             fieldWithPath("jti").description("[JWT ID](https://tools.ietf.org/html/rfc7519#section-4.1.7) Claim"),
             fieldWithPath("aud").description("[Audience](https://tools.ietf.org/html/rfc7519#section-4.1.3) Claim"),
             fieldWithPath("sub").description("[Subject](https://tools.ietf.org/html/rfc7519#section-4.1.2) Claim"),

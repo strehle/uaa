@@ -12,7 +12,23 @@
  *******************************************************************************/
 package org.cloudfoundry.identity.uaa.oauth;
 
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
 import com.fasterxml.jackson.core.type.TypeReference;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.cloudfoundry.identity.uaa.approval.Approval;
@@ -71,53 +87,12 @@ import org.springframework.security.oauth2.provider.TokenRequest;
 import org.springframework.security.oauth2.provider.client.BaseClientDetails;
 import org.springframework.security.oauth2.provider.token.AuthorizationServerTokenServices;
 import org.springframework.security.oauth2.provider.token.ResourceServerTokenServices;
+import org.springframework.security.oauth2.provider.token.TokenEnhancer;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.ADDITIONAL_AZ_ATTR;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.AUD;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.AUTHORITIES;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.AUTH_TIME;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.AZP;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.CID;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.CLIENT_ID;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.EMAIL;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.EXP;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.FAMILY_NAME;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.GIVEN_NAME;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.GRANT_TYPE;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.IAT;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.ISS;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.JTI;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.NONCE;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.ORIGIN;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.PHONE_NUMBER;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.PROFILE;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.REVOCABLE;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.REVOCATION_SIGNATURE;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.ROLES;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.SCOPE;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.SUB;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.USER_ATTRIBUTES;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.USER_ID;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.USER_NAME;
-import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.ZONE_ID;
+import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.*;
 import static org.cloudfoundry.identity.uaa.oauth.token.RevocableToken.TokenFormat.JWT;
 import static org.cloudfoundry.identity.uaa.oauth.token.RevocableToken.TokenFormat.OPAQUE;
 import static org.cloudfoundry.identity.uaa.util.TokenValidation.validate;
@@ -131,7 +106,7 @@ import static org.cloudfoundry.identity.uaa.util.TokenValidation.validate;
 public class UaaTokenServices implements AuthorizationServerTokenServices, ResourceServerTokenServices,
                 InitializingBean, ApplicationEventPublisherAware {
 
-    private static final String UAA_REFRESH_TOKEN = "uaa.refresh_token";
+    public static final String UAA_REFRESH_TOKEN = "uaa.offline_token";
     private final Log logger = LogFactory.getLog(getClass());
 
     private UaaUserDatabase userDatabase = null;
@@ -156,6 +131,8 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
 
     private boolean restrictRefreshGrant;
 
+    private UaaTokenEnhancer uaaTokenEnhancer = null;
+
     public Set<String> getExcludedClaims() {
         return excludedClaims;
     }
@@ -174,6 +151,10 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
 
     public void setTokenProvisioning(RevocableTokenProvisioning tokenProvisioning) {
         this.tokenProvisioning = tokenProvisioning;
+    }
+
+    public void setUaaTokenEnhancer(UaaTokenEnhancer uaaTokenEnhancer) {
+        this.uaaTokenEnhancer = uaaTokenEnhancer;
     }
 
     @Override
@@ -272,6 +253,9 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
         @SuppressWarnings("unchecked")
         Map<String, String> additionalAuthorizationInfo = (Map<String, String>) claims.get(ADDITIONAL_AZ_ATTR);
 
+        @SuppressWarnings("unchecked")
+        Map<String, String> externalAttributes = (Map<String, String>) claims.get(EXTERNAL_ATTR);
+
         String revocableHashSignature = (String)claims.get(REVOCATION_SIGNATURE);
         if (StringUtils.hasText(revocableHashSignature)) {
             String newRevocableHashSignature = UaaTokenUtils.getRevocableTokenSignature(client, user);
@@ -299,6 +283,7 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
                 refreshTokenValue,
                 nonce,
                 additionalAuthorizationInfo,
+                externalAttributes,
                 new HashSet<>(),
                 revocableHashSignature,
                 false,
@@ -367,6 +352,7 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
                                                    String refreshToken,
                                                    String nonce,
                                                    Map<String, String> additionalAuthorizationAttributes,
+                                                   Map<String, String> externalAttributes,
                                                    Set<String> responseTypes,
                                                    String revocableHashSignature,
                                                    boolean forceIdTokenCreation,
@@ -388,6 +374,9 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
         info.put(JTI, accessToken.getValue());
         if (null != additionalAuthorizationAttributes) {
             info.put(ADDITIONAL_AZ_ATTR, additionalAuthorizationAttributes);
+        }
+        if (null != externalAttributes) {
+            info.put(EXTERNAL_ATTR, externalAttributes);
         }
         if (nonce != null) {
             info.put(NONCE, nonce);
@@ -618,7 +607,10 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
         Integer validity = client.getAccessTokenValiditySeconds();
         Set<String> responseTypes = extractResponseTypes(authentication);
 
-
+        Map<String,String> externalAttributes = null;
+        if (uaaTokenEnhancer != null) {
+            externalAttributes = uaaTokenEnhancer.getExternalAttributes(authentication);
+        }
 
         CompositeAccessToken accessToken =
             createAccessToken(
@@ -635,12 +627,14 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
                 refreshToken != null ? refreshToken.getValue() : null,
                 nonce,
                 additionalAuthorizationAttributes,
+                externalAttributes,
                 responseTypes,
                 revocableHashSignature,
                 wasIdTokenRequestedThroughAuthCodeScopeParameter,
                 externalGroupsForIdToken,
                 userAttributesForIdToken,
                 revocable);
+
         if (revocable) {
             return persistRevocableToken(tokenId, refreshTokenId, accessToken, refreshToken, clientId, userId, opaque);
         } else {
@@ -765,6 +759,11 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
 
         UaaUser user = userDatabase.retrieveUserById(userId);
 
+        Map<String,String> externalAttributes = null;
+        if (uaaTokenEnhancer != null) {
+            externalAttributes = uaaTokenEnhancer.getExternalAttributes(authentication);
+        }
+
         String content;
         try {
             content = JsonUtils.writeValueAsString(
@@ -777,7 +776,8 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
                     grantType,
                     additionalAuthorizationAttributes,authentication.getOAuth2Request().getResourceIds(),
                     revocableHashSignature,
-                    revocable
+                    revocable,
+                    externalAttributes
                 )
             );
         } catch (JsonUtils.JsonUtilException e) {
@@ -804,7 +804,8 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
         Map<String, String> additionalAuthorizationAttributes,
         Set<String> resourceIds,
         String revocableSignature,
-        boolean revocable) {
+        boolean revocable,
+        Map<String, String> externalAttributes) {
 
         Map<String, Object> response = new LinkedHashMap<String, Object>();
 
@@ -813,6 +814,9 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
         response.put(SCOPE, scopes);
         if (null != additionalAuthorizationAttributes) {
             response.put(ADDITIONAL_AZ_ATTR, additionalAuthorizationAttributes);
+        }
+        if (null != externalAttributes) {
+            response.put(EXTERNAL_ATTR, externalAttributes);
         }
 
         response.put(IAT, System.currentTimeMillis() / 1000);
