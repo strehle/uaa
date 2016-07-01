@@ -1,5 +1,5 @@
 /*******************************************************************************
- *     Cloud Foundry 
+ *     Cloud Foundry
  *     Copyright (c) [2009-2016] Pivotal Software, Inc. All Rights Reserved.
  *
  *     This product is licensed to you under the Apache License, Version 2.0 (the "License").
@@ -12,17 +12,17 @@
  *******************************************************************************/
 package org.cloudfoundry.identity.uaa.resources;
 
+import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.JsonPathException;
+import org.cloudfoundry.identity.uaa.util.JsonUtils;
+import org.springframework.util.Assert;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
-import org.springframework.expression.Expression;
-import org.springframework.expression.spel.standard.SpelExpressionParser;
-import org.springframework.expression.spel.support.StandardEvaluationContext;
-import org.springframework.util.Assert;
 
 public class SearchResultsFactory {
     public static <T> SearchResults<Map<String, Object>> cropAndBuildSearchResultFrom(
@@ -46,7 +46,7 @@ public class SearchResultsFactory {
             count = input.size() - (startIndex - 1);
         }
 
-        input = count>0 ? input.subList(startIndex-1, startIndex-1+count) : Collections.<T>emptyList();
+        input = count>0 ? input.subList(startIndex-1, startIndex-1+count) : Collections.emptyList();
 
         return buildSearchResultFrom(
             input,
@@ -54,7 +54,7 @@ public class SearchResultsFactory {
             count,
             total,
             attributes,
-            new SimpleAttributeNameMapper(Collections.<String, String> emptyMap()),
+            new SimpleAttributeNameMapper(Collections.emptyMap()),
             schemas);
 
     }
@@ -74,7 +74,7 @@ public class SearchResultsFactory {
             count,
             total,
             attributes,
-            new SimpleAttributeNameMapper(Collections.<String, String> emptyMap()),
+            new SimpleAttributeNameMapper(Collections.emptyMap()),
             schemas);
 
     }
@@ -90,28 +90,35 @@ public class SearchResultsFactory {
 
         Assert.state(input.size() <= count,
                         "Cannot build search results from parent list. Use subList before you call this method.");
-        Map<String, Expression> expressions = buildExpressions(attributes, mapper);
-        StandardEvaluationContext context = new StandardEvaluationContext();
-        Collection<Map<String, Object>> results = new ArrayList<Map<String, Object>>();
+        Collection<Map<String, Object>> results = new ArrayList<>();
         for (T object : input) {
-            Map<String, Object> map = new LinkedHashMap<String, Object>();
-            for (String attribute : expressions.keySet()) {
-                map.put(attribute, expressions.get(attribute).getValue(context, object));
+            Map<String, Object> map = new LinkedHashMap<>();
+            String serializedObject = JsonUtils.writeValueAsString(object);
+            for (String attribute : attributes) {
+                try {
+                    extractAttribute(map, serializedObject, attribute, attribute);
+                } catch (JsonPathException e) {
+                    if (attribute==null || attribute.equals(mapper.mapToInternal(attribute))) {
+                        throw e;
+                    } else {
+                        try {
+                            extractAttribute(map, serializedObject, attribute, mapper.mapToInternal(attribute));
+                        } catch (JsonPathException ee) {
+                            map.put(attribute, null);
+                        }
+
+                    }
+                }
             }
             results.add(map);
         }
 
-        return new SearchResults<Map<String, Object>>(schemas, results, startIndex, count, total);
+        return new SearchResults<>(schemas, results, startIndex, count, total);
     }
 
-    private static Map<String, Expression> buildExpressions(String[] attributes, AttributeNameMapper mapper) {
-        Map<String, Expression> expressions = new LinkedHashMap<String, Expression>();
-        for (String attribute : attributes) {
-            String spel = mapper != null ? mapper.mapToInternal(attribute) : attribute;
-            Expression expression = new SpelExpressionParser().parseExpression(spel);
-            expressions.put(attribute, expression);
-        }
-        return expressions;
+    protected static void extractAttribute(Map<String, Object> map, String serializedObject, String namedAttribute, String attribute) {
+        String jsonPath = "$." + attribute;
+        Object value = JsonPath.read(serializedObject, jsonPath);
+        map.put(namedAttribute, value);
     }
-
 }
