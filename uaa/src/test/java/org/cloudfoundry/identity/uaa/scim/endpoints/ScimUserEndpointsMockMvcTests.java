@@ -36,6 +36,7 @@ import org.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.common.util.RandomValueStringGenerator;
 import org.springframework.security.oauth2.provider.ClientDetails;
 import org.springframework.security.oauth2.provider.client.BaseClientDetails;
@@ -56,13 +57,12 @@ import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.CoreMatchers.startsWith;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.core.Is.is;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.security.oauth2.common.util.OAuth2Utils.CLIENT_ID;
 import static org.springframework.security.oauth2.common.util.OAuth2Utils.REDIRECT_URI;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -148,6 +148,7 @@ public class ScimUserEndpointsMockMvcTests extends InjectedMockContextTest {
     public void testCanCreateUserWithExclamationMark() throws Exception {
         String email = "joe!!@"+generator.generate().toLowerCase()+".com";
         ScimUser user = getScimUser();
+        user.getEmails().clear();
         user.setUserName(email);
         user.setPrimaryEmail(email);
         createUser(user, scimReadWriteToken, null);
@@ -165,6 +166,15 @@ public class ScimUserEndpointsMockMvcTests extends InjectedMockContextTest {
             .andExpect(jsonPath("$.error").value("invalid_password"))
             .andExpect(jsonPath("$.message").value("Password must be no more than 255 characters in length."))
             .andExpect(jsonPath("$.error_description").value("Password must be no more than 255 characters in length."));
+    }
+
+    @Test
+    public void test_Create_User_More_Than_One_Email() throws Exception {
+        ScimUser scimUser = getScimUser();
+        String secondEmail = "joe@"+generator.generate().toLowerCase()+".com";
+        scimUser.addEmail(secondEmail);
+        createUserAndReturnResult(scimUser, scimReadWriteToken, null, null)
+            .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -339,8 +349,8 @@ public class ScimUserEndpointsMockMvcTests extends InjectedMockContextTest {
                 .andExpect(content()
                         .string(JsonObjectMatcherUtils.matchesJsonObject(
                                 new JSONObject()
-                                        .put("error_description", "An email must be provided.")
-                                        .put("message", "An email must be provided.")
+                                        .put("error_description", "Exactly one email must be provided.")
+                                        .put("message", "Exactly one email must be provided.")
                                         .put("error", "invalid_scim_resource"))));
     }
 
@@ -358,8 +368,8 @@ public class ScimUserEndpointsMockMvcTests extends InjectedMockContextTest {
                 .andExpect(content()
                         .string(JsonObjectMatcherUtils.matchesJsonObject(
                                 new JSONObject()
-                                        .put("error_description", "An email must be provided.")
-                                        .put("message", "An email must be provided.")
+                                        .put("error_description", "Exactly one email must be provided.")
+                                        .put("message", "Exactly one email must be provided.")
                                         .put("error", "invalid_scim_resource"))));
     }
 
@@ -557,6 +567,29 @@ public class ScimUserEndpointsMockMvcTests extends InjectedMockContextTest {
     @Test
     public void testGetUser() throws Exception {
         getUser(scimReadWriteToken, HttpStatus.OK.value());
+    }
+
+    @Test
+    public void testGetUserWithInvalidAttributes() throws Exception {
+
+        String nonexistentAttribute = "displayBlaBla";
+
+        MockHttpServletRequestBuilder get = get("/Users")
+          .header("Authorization", "Bearer " + scimReadWriteToken)
+          .contentType(MediaType.APPLICATION_JSON)
+          .param("attributes", nonexistentAttribute)
+          .accept(APPLICATION_JSON);
+
+        MvcResult mvcResult = getMockMvc().perform(get)
+          .andExpect(status().isOk())
+          .andReturn();
+
+        String body = mvcResult.getResponse().getContentAsString();
+
+        List<Map> attList = (List) JsonUtils.readValue(body, Map.class).get("resources");
+        for (Map<String, Object> attMap : attList) {
+            assertNull(attMap.get(nonexistentAttribute));
+        }
     }
 
     @Test

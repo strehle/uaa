@@ -117,7 +117,7 @@ public class ScimUserEndpointDocs extends InjectedMockContextTest {
         fieldWithPath("resources[].phoneNumbers").type(ARRAY).description(phoneNumbersListDescription),
         fieldWithPath("resources[].phoneNumbers[].value").type(STRING).description(phoneNumbersDescription),
         fieldWithPath("resources[].emails").type(ARRAY).description(emailListDescription),
-        fieldWithPath("resources[].emails[].value").type(ARRAY).description(emailDescription),
+        fieldWithPath("resources[].emails[].value").type(STRING).description(emailDescription),
         fieldWithPath("resources[].emails[].primary").type(BOOLEAN).description(emailPrimaryDescription),
         fieldWithPath("resources[].groups").type(ARRAY).description(groupDescription),
         fieldWithPath("resources[].groups[].value").type(STRING).description(groupIdDescription),
@@ -151,7 +151,7 @@ public class ScimUserEndpointDocs extends InjectedMockContextTest {
         fieldWithPath("phoneNumbers").optional(null).type(ARRAY).description(phoneNumbersListDescription),
         fieldWithPath("phoneNumbers[].value").optional(null).type(STRING).description(phoneNumbersDescription),
         fieldWithPath("emails").required().type(ARRAY).description(emailListDescription),
-        fieldWithPath("emails[].value").required().type(ARRAY).description(emailDescription),
+        fieldWithPath("emails[].value").required().type(STRING).description(emailDescription),
         fieldWithPath("emails[].primary").required().type(BOOLEAN).description(emailPrimaryDescription),
         fieldWithPath("active").optional(true).type(BOOLEAN).description(userActiveDescription),
         fieldWithPath("verified").optional(false).type(BOOLEAN).description(userVerifiedDescription),
@@ -171,7 +171,7 @@ public class ScimUserEndpointDocs extends InjectedMockContextTest {
         fieldWithPath("phoneNumbers").type(ARRAY).description(phoneNumbersListDescription),
         fieldWithPath("phoneNumbers[].value").type(STRING).description(phoneNumbersDescription),
         fieldWithPath("emails").type(ARRAY).description(emailListDescription),
-        fieldWithPath("emails[].value").type(ARRAY).description(emailDescription),
+        fieldWithPath("emails[].value").type(STRING).description(emailDescription),
         fieldWithPath("emails[].primary").type(BOOLEAN).description(emailPrimaryDescription),
         fieldWithPath("groups").type(ARRAY).description(groupDescription),
         fieldWithPath("groups[].value").type(STRING).description(groupIdDescription),
@@ -200,7 +200,7 @@ public class ScimUserEndpointDocs extends InjectedMockContextTest {
         fieldWithPath("phoneNumbers").optional(null).type(ARRAY).description(phoneNumbersListDescription),
         fieldWithPath("phoneNumbers[].value").optional(null).type(STRING).description(phoneNumbersDescription),
         fieldWithPath("emails").required().type(ARRAY).description(emailListDescription),
-        fieldWithPath("emails[].value").required().type(ARRAY).description(emailDescription),
+        fieldWithPath("emails[].value").required().type(STRING).description(emailDescription),
         fieldWithPath("emails[].primary").required().type(BOOLEAN).description(emailPrimaryDescription),
         fieldWithPath("groups").ignored().type(ARRAY).description("Groups are not created at this time."),
         fieldWithPath("approvals").ignored().type(ARRAY).description("Approvals are not created at this time"),
@@ -223,7 +223,7 @@ public class ScimUserEndpointDocs extends InjectedMockContextTest {
         fieldWithPath("phoneNumbers").type(ARRAY).description(phoneNumbersListDescription),
         fieldWithPath("phoneNumbers[].value").type(STRING).description(phoneNumbersDescription),
         fieldWithPath("emails").type(ARRAY).description(emailListDescription),
-        fieldWithPath("emails[].value").type(ARRAY).description(emailDescription),
+        fieldWithPath("emails[].value").type(STRING).description(emailDescription),
         fieldWithPath("emails[].primary").type(BOOLEAN).description(emailPrimaryDescription),
         fieldWithPath("groups").type(ARRAY).description(groupDescription),
         fieldWithPath("groups[].value").type(STRING).description(groupIdDescription),
@@ -396,7 +396,7 @@ public class ScimUserEndpointDocs extends InjectedMockContextTest {
                          preprocessResponse(prettyPrint()),
                          pathParameters(parameterWithName("userId").description(userIdDescription)),
                          requestHeaders(
-                             headerWithName("Authorization").description("Access token with scim.read or uaa.admin required"),
+                             headerWithName("Authorization").description("Access token with scim.write or uaa.admin required"),
                              headerWithName("If-Match").description("The version of the SCIM object to be updated. Wildcard (*) accepted.")
                          ),
                          updateFields,
@@ -431,7 +431,7 @@ public class ScimUserEndpointDocs extends InjectedMockContextTest {
                          preprocessResponse(prettyPrint()),
                          pathParameters(parameterWithName("userId").description(userIdDescription)),
                          requestHeaders(
-                             headerWithName("Authorization").description("Access token with scim.read or uaa.admin required"),
+                             headerWithName("Authorization").description("Access token with scim.write or uaa.admin required"),
                              headerWithName("If-Match").optional().description("The version of the SCIM object to be deleted. Optional.")
                          ),
 
@@ -464,7 +464,7 @@ public class ScimUserEndpointDocs extends InjectedMockContextTest {
                          preprocessResponse(prettyPrint()),
                          pathParameters(parameterWithName("userId").description(userIdDescription)),
                          requestHeaders(
-                             headerWithName("Authorization").description("Access token with scim.read or uaa.admin required")
+                             headerWithName("Authorization").description("Access token with password.write or uaa.admin required")
                          ),
                          requestFields(
                              fieldWithPath("oldPassword").required().description("Old password.").type(STRING),
