@@ -22,7 +22,7 @@
   xmlns:oauth="http://www.springframework.org/schema/security/oauth2"
   xmlns:util="http://www.springframework.org/schema/util"
   xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
-    http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-4.0.xsd
+    http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-4.1.xsd
     http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
     http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc-4.0.xsd
     http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-4.0.xsd
@@ -116,7 +116,7 @@
           use-expressions="true"
           pattern="/invite_users/**"
           xmlns="http://www.springframework.org/schema/security">
-        <intercept-url pattern="/invite_users" access="#oauth2.hasAnyScope('scim.invite')" method="POST"/>
+        <intercept-url pattern="/invite_users" access="#oauth2.hasAnyScope('scim.invite') or #oauth2.hasScopeInAuthZone('zones.{zone.id}.admin')" method="POST"/>
         <expression-handler ref="oauthWebExpressionHandler" />
         <access-denied-handler ref="oauthAccessDeniedHandler" />
         <custom-filter ref="resourceAgnosticAuthenticationFilter" position="PRE_AUTH_FILTER" />
@@ -510,8 +510,7 @@
     <bean id="emailService" class="org.cloudfoundry.identity.uaa.message.EmailService">
         <constructor-arg index="0" ref="#{T(org.springframework.util.StringUtils).hasText('${smtp.host:}') ? 'smtpJavaMailSender' : 'fakeJavaMailSender'}"/>
         <constructor-arg index="1" value="${login.url:http://localhost:8080/uaa}"/>
-        <constructor-arg index="2" value="${login.branding.companyName:}"/>
-        <constructor-arg index="3" value="${smtp.from_address:}" />
+        <constructor-arg index="2" value="${smtp.from_address:}" />
     </bean>
 
     <bean id="smtpJavaMailSender" class="org.springframework.mail.javamail.JavaMailSenderImpl">
@@ -543,7 +542,6 @@
         <constructor-arg ref="scimUserProvisioning"/>
         <constructor-arg ref="jdbcClientDetailsService"/>
         <constructor-arg ref="uaaPasswordValidator"/>
-        <constructor-arg name="companyName" value="${login.branding.companyName:}" />
     </bean>
 
     <bean id="uaaPasswordValidator" class="org.cloudfoundry.identity.uaa.scim.validate.UaaPasswordPolicyValidator">
@@ -572,7 +570,6 @@
     <bean id="changeEmailService" class="org.cloudfoundry.identity.uaa.account.EmailChangeEmailService">
         <constructor-arg ref="mailTemplateEngine"/>
         <constructor-arg ref="messageService"/>
-        <constructor-arg name="companyName" value="${login.branding.companyName:}" />
         <constructor-arg ref="jdbcClientDetailsService"/>
         <constructor-arg ref="scimUserProvisioning"/>
         <constructor-arg ref="codeStore"/>
@@ -582,7 +579,6 @@
         <constructor-arg ref="resetPasswordService"/>
         <constructor-arg ref="messageService"/>
         <constructor-arg ref="mailTemplateEngine"/>
-        <constructor-arg name="companyName" value="${login.branding.companyName:}"/>
         <constructor-arg ref="codeStore"/>
         <constructor-arg ref="userDatabase"/>
     </bean>
