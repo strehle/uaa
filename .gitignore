@@ -5,6 +5,7 @@
 */src/main/java/META-INF/
 */src/main/webapp/META-INF/
 */src/main/*/WEB-INF/lib/
+*/target/
 out/
 .access_token
 .result
