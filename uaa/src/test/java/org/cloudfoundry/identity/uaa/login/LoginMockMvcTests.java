@@ -32,6 +32,7 @@ import org.cloudfoundry.identity.uaa.provider.saml.BootstrapSamlIdentityProvider
 import org.cloudfoundry.identity.uaa.scim.ScimUser;
 import org.cloudfoundry.identity.uaa.scim.ScimUserProvisioning;
 import org.cloudfoundry.identity.uaa.scim.jdbc.JdbcScimUserProvisioning;
+import org.cloudfoundry.identity.uaa.security.web.CookieBasedCsrfTokenRepository;
 import org.cloudfoundry.identity.uaa.security.web.CorsFilter;
 import org.cloudfoundry.identity.uaa.test.TestClient;
 import org.cloudfoundry.identity.uaa.user.UaaAuthority;
@@ -90,6 +91,8 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.EMPTY_LIST;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
+import static org.cloudfoundry.identity.uaa.constants.OriginKeys.LDAP;
+import static org.cloudfoundry.identity.uaa.constants.OriginKeys.UAA;
 import static org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils.CookieCsrfPostProcessor.cookieCsrf;
 import static org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils.createOtherIdentityZone;
 import static org.cloudfoundry.identity.uaa.zone.IdentityZone.getUaa;
@@ -219,6 +222,47 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
 
     protected void setLogout(Links.Logout logout) {
         MockMvcUtils.setLogout(getWebApplicationContext(), getUaa().getId(), logout);
+    }
+
+
+    @Test
+    public void test_cookie_csrf() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+
+        MockHttpServletRequestBuilder invalidPost = post("/login.do")
+            .session(session)
+            .param("username", "marissa")
+            .param("password", "koala");
+
+        getMockMvc().perform(invalidPost)
+            .andDo(print())
+            .andExpect(status().isForbidden())
+            .andExpect(forwardedUrl("/login?error=invalid_login_request"));
+
+        session = new MockHttpSession();
+        String csrfValue = "12345";
+        Cookie cookie = new Cookie(CookieBasedCsrfTokenRepository.DEFAULT_CSRF_COOKIE_NAME, csrfValue);
+
+        getMockMvc().perform(
+            invalidPost
+                .cookie(cookie)
+                .param(CookieBasedCsrfTokenRepository.DEFAULT_CSRF_COOKIE_NAME, "other-value")
+        )
+            .andDo(print())
+            .andExpect(status().isForbidden())
+            .andExpect(forwardedUrl("/login?error=invalid_login_request"));
+
+        MockHttpServletRequestBuilder validPost = post("/login.do")
+            .session(session)
+            .param("username", "marissa")
+            .param("password", "koala")
+            .cookie(cookie)
+            .param(CookieBasedCsrfTokenRepository.DEFAULT_CSRF_COOKIE_NAME, csrfValue);
+        getMockMvc().perform(validPost)
+            .andDo(print())
+            .andExpect(status().isFound())
+            .andExpect(redirectedUrl("/"));
+
     }
 
     @Test
@@ -985,7 +1029,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
             .andExpect(status().isOk());
 
         IdentityProviderProvisioning provisioning = getWebApplicationContext().getBean(IdentityProviderProvisioning.class);
-        IdentityProvider uaaProvider = provisioning.retrieveByOrigin(OriginKeys.UAA, identityZone.getId());
+        IdentityProvider uaaProvider = provisioning.retrieveByOrigin(UAA, identityZone.getId());
         try {
             IdentityZoneHolder.set(identityZone);
             uaaProvider.setActive(false);
@@ -1032,7 +1076,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
 
         IdentityZoneHolder.set(identityZone);
         IdentityProviderProvisioning identityProviderProvisioning = getWebApplicationContext().getBean(IdentityProviderProvisioning.class);
-        IdentityProvider uaaIdentityProvider = identityProviderProvisioning.retrieveByOrigin(OriginKeys.UAA, identityZone.getId());
+        IdentityProvider uaaIdentityProvider = identityProviderProvisioning.retrieveByOrigin(UAA, identityZone.getId());
         uaaIdentityProvider.setActive(false);
         identityProviderProvisioning.update(uaaIdentityProvider);
 
@@ -1072,7 +1116,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
 
         IdentityZoneHolder.set(identityZone);
         IdentityProviderProvisioning identityProviderProvisioning = getWebApplicationContext().getBean(IdentityProviderProvisioning.class);
-        IdentityProvider uaaIdentityProvider = identityProviderProvisioning.retrieveByOrigin(OriginKeys.UAA, identityZone.getId());
+        IdentityProvider uaaIdentityProvider = identityProviderProvisioning.retrieveByOrigin(UAA, identityZone.getId());
         uaaIdentityProvider.setActive(false);
         identityProviderProvisioning.update(uaaIdentityProvider);
 
@@ -1178,7 +1222,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
 
         IdentityZoneHolder.set(identityZone);
         IdentityProviderProvisioning identityProviderProvisioning = getWebApplicationContext().getBean(IdentityProviderProvisioning.class);
-        IdentityProvider uaaIdentityProvider = identityProviderProvisioning.retrieveByOrigin(OriginKeys.UAA, identityZone.getId());
+        IdentityProvider uaaIdentityProvider = identityProviderProvisioning.retrieveByOrigin(UAA, identityZone.getId());
         uaaIdentityProvider.setActive(false);
         identityProviderProvisioning.update(uaaIdentityProvider);
 
@@ -1905,8 +1949,8 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         IdentityZone zone = MultitenancyFixture.identityZone("puppy-ldap", "puppy-ldap");
         createOtherIdentityZone(zone.getSubdomain(), getMockMvc(), getWebApplicationContext());
 
-        IdentityProvider identityProvider = MultitenancyFixture.identityProvider(OriginKeys.LDAP, zone.getId());
-        identityProvider.setType(OriginKeys.LDAP);
+        IdentityProvider identityProvider = MultitenancyFixture.identityProvider(LDAP, zone.getId());
+        identityProvider.setType(LDAP);
         identityProvider.setConfig(new LdapIdentityProviderDefinition().setEmailDomain(Collections.singletonList("testLdap.org")));
 
         MockMvcUtils.createIdpUsingWebRequest(getMockMvc(), zone.getId(), adminToken, identityProvider, status().isCreated());
@@ -2027,7 +2071,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         BaseClientDetails client = new BaseClientDetails(clientId, "", "", "client_credentials", "uaa.none", "http://*.wildcard.testing,http://testing.com");
         client.setClientSecret("secret");
         client.addAdditionalInformation(ClientConstants.CLIENT_NAME, "woohoo");
-        client.addAdditionalInformation(ClientConstants.ALLOWED_PROVIDERS, asList(originKey, "other-provider", "uaa", "ldap"));
+        client.addAdditionalInformation(ClientConstants.ALLOWED_PROVIDERS, asList(originKey, "other-provider", UAA, LDAP));
         MockMvcUtils.utils().createClient(getMockMvc(), adminToken, client, zone);
 
         SavedRequest savedRequest = getSavedRequest(client);
@@ -2038,7 +2082,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
 
     private void changeLockoutPolicyForIdpInZone(IdentityZone zone) throws Exception {
         IdentityProviderProvisioning identityProviderProvisioning = getWebApplicationContext().getBean(IdentityProviderProvisioning.class);
-        IdentityProvider identityProvider = identityProviderProvisioning.retrieveByOrigin(OriginKeys.UAA, zone.getId());
+        IdentityProvider identityProvider = identityProviderProvisioning.retrieveByOrigin(UAA, zone.getId());
 
         LockoutPolicy policy = new LockoutPolicy();
         policy.setLockoutAfterFailures(2);
