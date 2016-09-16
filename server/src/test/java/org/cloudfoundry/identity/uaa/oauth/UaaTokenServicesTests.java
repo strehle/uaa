@@ -53,6 +53,7 @@ import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.stubbing.Answer;
+import org.opensaml.saml2.core.AuthnContext;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -985,8 +986,13 @@ public class UaaTokenServicesTests {
     @Test
     public void create_id_token_with_amr_claim() throws Exception {
         Jwt idTokenJwt = getIdToken(Arrays.asList(OPENID, ROLES));
-        assertTrue(idTokenJwt.getClaims().contains("\"roles\":[\"group2\",\"group1\"]"));
+        assertTrue(idTokenJwt.getClaims().contains("\"amr\":[\"ext\",\"rba\",\"mfa\"]"));
+    }
 
+    @Test
+    public void create_id_token_with_acr_claim() throws Exception {
+        Jwt idTokenJwt = getIdToken(Arrays.asList(OPENID, ROLES));
+        assertTrue(idTokenJwt.getClaims().contains("\"" + ClaimConstants.ACR + "\":{\"values\":[\""));
     }
 
     @Test
@@ -1021,6 +1027,7 @@ public class UaaTokenServicesTests {
         Set<String> amr = new HashSet<>();
         amr.addAll(Arrays.asList("ext", "mfa", "rba"));
         userAuthentication.setAuthenticationMethods(amr);
+        userAuthentication.setAuthContextClassRef(new HashSet<>(Arrays.asList(AuthnContext.PASSWORD_AUTHN_CTX)));
         OAuth2Authentication authentication = new OAuth2Authentication(authorizationRequest.createOAuth2Request(), userAuthentication);
 
         OAuth2AccessToken accessToken = tokenServices.createAccessToken(authentication);

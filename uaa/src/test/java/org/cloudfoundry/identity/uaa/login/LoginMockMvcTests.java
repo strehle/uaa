@@ -34,7 +34,6 @@ import org.cloudfoundry.identity.uaa.scim.ScimUserProvisioning;
 import org.cloudfoundry.identity.uaa.scim.jdbc.JdbcScimUserProvisioning;
 import org.cloudfoundry.identity.uaa.security.web.CookieBasedCsrfTokenRepository;
 import org.cloudfoundry.identity.uaa.security.web.CorsFilter;
-import org.cloudfoundry.identity.uaa.test.TestClient;
 import org.cloudfoundry.identity.uaa.user.UaaAuthority;
 import org.cloudfoundry.identity.uaa.util.JsonUtils;
 import org.cloudfoundry.identity.uaa.util.SetServerNameRequestPostProcessor;
@@ -144,11 +143,8 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
     private IdentityZoneConfiguration originalConfiguration;
     private IdentityZoneConfiguration identityZoneConfiguration;
 
-    private TestClient testClient;
-
     @Before
     public void setUpContext() throws Exception {
-        testClient = new TestClient(getMockMvc());
         SecurityContextHolder.clearContext();
         webApplicationContext = getWebApplicationContext();
         mockEnvironment = (MockEnvironment) webApplicationContext.getEnvironment();
@@ -163,7 +159,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
     }
 
     @After
-    public void resetGenerator() {
+    public void resetGenerator() throws Exception {
         getWebApplicationContext().getBean(JdbcExpiringCodeStore.class).setGenerator(new RandomValueStringGenerator(24));
     }
 
@@ -192,35 +188,35 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
             .andExpect(content().string(containsString("/create_account")));
     }
 
-    protected void setDisableInternalAuth(boolean disable) {
+    protected void setDisableInternalAuth(boolean disable) throws Exception {
        MockMvcUtils.setDisableInternalAuth(getWebApplicationContext(), getUaa().getId(), disable);
     }
 
-    protected void setDisableInternalUserManagement(boolean disabled) {
+    protected void setDisableInternalUserManagement(boolean disabled) throws Exception {
         MockMvcUtils.setDisableInternalUserManagement(getWebApplicationContext(), getUaa().getId(), disabled);
     }
 
-    protected void setSelfServiceLinksEnabled(boolean enabled) {
+    protected void setSelfServiceLinksEnabled(boolean enabled) throws Exception {
         MockMvcUtils.setSelfServiceLinksEnabled(getWebApplicationContext(), getUaa().getId(), enabled);
     }
 
-    protected void setZoneConfiguration(IdentityZoneConfiguration configuration) {
+    protected void setZoneConfiguration(IdentityZoneConfiguration configuration) throws Exception {
         MockMvcUtils.setZoneConfiguration(getWebApplicationContext(), getUaa().getId(), configuration);
     }
 
-    protected void setPrompts(List<Prompt> prompts) {
+    protected void setPrompts(List<Prompt> prompts) throws Exception {
         MockMvcUtils.setPrompts(getWebApplicationContext(), getUaa().getId(), prompts);
     }
 
-    protected List<Prompt> getPrompts() {
+    protected List<Prompt> getPrompts() throws Exception {
         return MockMvcUtils.getPrompts(getWebApplicationContext(), getUaa().getId());
     }
 
-    protected Links.Logout getLogout() {
+    protected Links.Logout getLogout() throws Exception {
         return MockMvcUtils.getLogout(getWebApplicationContext(), getUaa().getId());
     }
 
-    protected void setLogout(Links.Logout logout) {
+    protected void setLogout(Links.Logout logout) throws Exception {
         MockMvcUtils.setLogout(getWebApplicationContext(), getUaa().getId(), logout);
     }
 
@@ -355,7 +351,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
             .andExpect(content().string(allOf(containsString("style>.header-image {background-image: url(data:image/png;base64,/sM4lL==);}</style>"), not(containsString("product-logo.png")))));
     }
 
-    private void setZoneFavIconAndProductLogo(String favIcon, String productLogo) {
+    private void setZoneFavIconAndProductLogo(String favIcon, String productLogo) throws Exception {
         BrandingInformation branding = new BrandingInformation();
         branding.setSquareLogo(favIcon);
         branding.setProductLogo(productLogo);
@@ -1820,6 +1816,63 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
             .andExpect(xpath("//input[@name='email']").exists())
             .andExpect(xpath("//div[@class='action']//a").string("Create account"))
             .andExpect(xpath("//input[@type='submit']/@value").string("Next"));
+    }
+
+    @Test
+    public void accountChooserEnabled_NoSaveAccounts() throws Exception {
+        String clientName = "woohoo";
+        IdentityZoneConfiguration config = new IdentityZoneConfiguration();
+        config.setIdpDiscoveryEnabled(true);
+        config.setAccountChooserEnabled(true);
+        IdentityZone zone = setupZone(config);
+
+        MockHttpSession session = new MockHttpSession();
+        String clientId = generator.generate();
+        BaseClientDetails client = new BaseClientDetails(clientId, "", "", "client_credentials", "uaa.none", "http://*.wildcard.testing,http://testing.com");
+        client.setClientSecret("secret");
+        client.addAdditionalInformation(ClientConstants.CLIENT_NAME, clientName);
+        MockMvcUtils.utils().createClient(getMockMvc(), adminToken, client, zone);
+
+        SavedAccountOption savedAccount = new SavedAccountOption();
+        savedAccount.setEmail("test@example.org");
+        savedAccount.setOrigin("uaa");
+        savedAccount.setUserId("1234-5678");
+        savedAccount.setUsername("test@example.org");
+        getMockMvc().perform(get("/login")
+            .session(session)
+            .header("Accept", TEXT_HTML)
+            .with(new SetServerNameRequestPostProcessor(zone.getSubdomain() + ".localhost")))
+            .andExpect(status().isOk())
+            .andExpect(view().name("idp_discovery/email"));
+    }
+
+    @Test
+    public void accountChooserEnabled() throws Exception {
+        String clientName = "woohoo";
+        IdentityZoneConfiguration config = new IdentityZoneConfiguration();
+        config.setIdpDiscoveryEnabled(true);
+        config.setAccountChooserEnabled(true);
+        IdentityZone zone = setupZone(config);
+
+        MockHttpSession session = new MockHttpSession();
+        String clientId = generator.generate();
+        BaseClientDetails client = new BaseClientDetails(clientId, "", "", "client_credentials", "uaa.none", "http://*.wildcard.testing,http://testing.com");
+        client.setClientSecret("secret");
+        client.addAdditionalInformation(ClientConstants.CLIENT_NAME, clientName);
+        MockMvcUtils.utils().createClient(getMockMvc(), adminToken, client, zone);
+
+        SavedAccountOption savedAccount = new SavedAccountOption();
+        savedAccount.setEmail("test@example.org");
+        savedAccount.setOrigin("uaa");
+        savedAccount.setUserId("1234-5678");
+        savedAccount.setUsername("test@example.org");
+        getMockMvc().perform(get("/login")
+            .session(session)
+            .cookie(new Cookie("Saved-Account-12345678", JsonUtils.writeValueAsString(savedAccount)))
+            .header("Accept", TEXT_HTML)
+            .with(new SetServerNameRequestPostProcessor(zone.getSubdomain() + ".localhost")))
+            .andExpect(status().isOk())
+            .andExpect(view().name("idp_discovery/account_chooser"));
     }
 
     @Test

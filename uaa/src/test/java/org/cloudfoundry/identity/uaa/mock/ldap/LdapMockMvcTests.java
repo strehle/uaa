@@ -14,7 +14,6 @@ package org.cloudfoundry.identity.uaa.mock.ldap;
 
 import org.cloudfoundry.identity.uaa.TestClassNullifier;
 import org.cloudfoundry.identity.uaa.authentication.UaaAuthentication;
-import org.cloudfoundry.identity.uaa.authentication.manager.AuthzAuthenticationManager;
 import org.cloudfoundry.identity.uaa.authentication.manager.DynamicZoneAwareAuthenticationManager;
 import org.cloudfoundry.identity.uaa.constants.OriginKeys;
 import org.cloudfoundry.identity.uaa.mock.util.ApacheDSHelper;
@@ -32,7 +31,6 @@ import org.cloudfoundry.identity.uaa.resources.jdbc.LimitSqlAdapter;
 import org.cloudfoundry.identity.uaa.scim.ScimUser;
 import org.cloudfoundry.identity.uaa.scim.jdbc.JdbcScimGroupProvisioning;
 import org.cloudfoundry.identity.uaa.scim.jdbc.JdbcScimUserProvisioning;
-import org.cloudfoundry.identity.uaa.test.TestClient;
 import org.cloudfoundry.identity.uaa.test.YamlServletProfileInitializerContextInitializer;
 import org.cloudfoundry.identity.uaa.user.UaaUser;
 import org.cloudfoundry.identity.uaa.user.UaaUserDatabase;
@@ -90,6 +88,7 @@ import static org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils.CookieCsrfPos
 import static org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils.utils;
 import static org.cloudfoundry.identity.uaa.provider.ExternalIdentityProviderDefinition.ATTRIBUTE_MAPPINGS;
 import static org.cloudfoundry.identity.uaa.provider.LdapIdentityProviderDefinition.LDAP_ATTRIBUTE_MAPPINGS;
+import static org.cloudfoundry.identity.uaa.provider.ldap.ProcessLdapProperties.SIMPLE;
 import static org.hamcrest.Matchers.arrayContainingInAnyOrder;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
@@ -107,6 +106,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.web.context.HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
@@ -121,19 +121,19 @@ public class LdapMockMvcTests extends TestClassNullifier {
     @Parameters(name = "{index}: auth[{0}]; group[{1}]; url[{2}]")
     public static Collection<Object[]> data() {
         return Arrays.asList(new Object[][]{
-//            {"ldap-simple-bind.xml", "ldap-groups-null.xml", "ldap://localhost:33389"},
-//            {"ldap-simple-bind.xml", "ldap-groups-as-scopes.xml", "ldap://localhost:33389"},
-//            {"ldap-simple-bind.xml", "ldap-groups-map-to-scopes.xml", "ldap://localhost:33389"},
-//            {"ldap-simple-bind.xml", "ldap-groups-map-to-scopes.xml", "ldaps://localhost:33636"},
-//            {"ldap-search-and-bind.xml", "ldap-groups-null.xml", "ldap://localhost:33389"},
-//            {"ldap-search-and-bind.xml", "ldap-groups-as-scopes.xml", "ldap://localhost:33389"},
-            {"ldap-search-and-bind.xml", "ldap-groups-map-to-scopes.xml", "ldap://localhost:33389"},
-//            {"ldap-search-and-bind.xml", "ldap-groups-map-to-scopes.xml", "ldaps://localhost:33636"},
-//            {"ldap-search-and-compare.xml", "ldap-groups-null.xml", "ldap://localhost:33389"},
-//            {"ldap-search-and-compare.xml", "ldap-groups-as-scopes.xml", "ldap://localhost:33389"},
-//            {"ldap-search-and-compare.xml", "ldap-groups-map-to-scopes.xml", "ldap://localhost:33389"},
-            {"ldap-search-and-compare.xml", "ldap-groups-as-scopes.xml", "ldaps://localhost:33636"},
-//            {"ldap-search-and-compare.xml", "ldap-groups-map-to-scopes.xml", "ldaps://localhost:33636"}
+//            {"ldap-simple-bind.xml", "ldap-groups-null.xml", "ldap://localhost:33389", SIMPLE},
+//            {"ldap-simple-bind.xml", "ldap-groups-as-scopes.xml", "ldap://localhost:33389", SIMPLE},
+//            {"ldap-simple-bind.xml", "ldap-groups-map-to-scopes.xml", "ldap://localhost:33389", SIMPLE},
+//            {"ldap-simple-bind.xml", "ldap-groups-map-to-scopes.xml", "ldaps://localhost:33636", NONE},
+//            {"ldap-search-and-bind.xml", "ldap-groups-null.xml", "ldap://localhost:33389", SIMPLE},
+            {"ldap-search-and-bind.xml", "ldap-groups-as-scopes.xml", "ldap://localhost:33389", SIMPLE},
+//            {"ldap-search-and-bind.xml", "ldap-groups-map-to-scopes.xml", "ldap://localhost:33389", SIMPLE},
+//            {"ldap-search-and-bind.xml", "ldap-groups-map-to-scopes.xml", "ldaps://localhost:33636", NONE},
+//            {"ldap-search-and-compare.xml", "ldap-groups-null.xml", "ldap://localhost:33389", NONE},
+//            {"ldap-search-and-compare.xml", "ldap-groups-as-scopes.xml", "ldap://localhost:33389", NONE},
+//            {"ldap-search-and-compare.xml", "ldap-groups-map-to-scopes.xml", "ldap://localhost:33389", NONE},
+//            {"ldap-search-and-compare.xml", "ldap-groups-as-scopes.xml", "ldaps://localhost:33636", NONE},
+//            {"ldap-search-and-compare.xml", "ldap-groups-map-to-scopes.xml", "ldaps://localhost:33636", NONE}
         });
     }
 
@@ -154,7 +154,6 @@ public class LdapMockMvcTests extends TestClassNullifier {
     XmlWebApplicationContext mainContext;
 
     MockMvc mockMvc;
-    TestClient testClient;
     JdbcTemplate jdbcTemplate;
     JdbcScimGroupProvisioning gDB;
     JdbcScimUserProvisioning uDB;
@@ -163,11 +162,13 @@ public class LdapMockMvcTests extends TestClassNullifier {
     private String ldapProfile;
     private String ldapGroup;
     private String ldapBaseUrl;
+    private String tlsConfig;
 
-    public LdapMockMvcTests(String ldapProfile, String ldapGroup, String baseUrl) {
+    public LdapMockMvcTests(String ldapProfile, String ldapGroup, String baseUrl, String tlsConfig) {
         this.ldapGroup = ldapGroup;
         this.ldapProfile = ldapProfile;
         this.ldapBaseUrl = baseUrl;
+        this.tlsConfig = tlsConfig;
     }
 
     @Before
@@ -185,6 +186,7 @@ public class LdapMockMvcTests extends TestClassNullifier {
         mockEnvironment.setProperty("ldap.base.userDn","cn=admin,ou=Users,dc=test,dc=com");
         mockEnvironment.setProperty("ldap.base.password","adminsecret");
         mockEnvironment.setProperty("ldap.ssl.skipverification","true");
+        mockEnvironment.setProperty("ldap.ssl.tls",tlsConfig);
 
         mainContext = new XmlWebApplicationContext();
         mainContext.setEnvironment(mockEnvironment);
@@ -202,7 +204,6 @@ public class LdapMockMvcTests extends TestClassNullifier {
         FilterChainProxy springSecurityFilterChain = mainContext.getBean("springSecurityFilterChain", FilterChainProxy.class);
         mockMvc = MockMvcBuilders.webAppContextSetup(mainContext).addFilter(springSecurityFilterChain)
                 .build();
-        testClient = new TestClient(mockMvc);
         jdbcTemplate = mainContext.getBean(JdbcTemplate.class);
         LimitSqlAdapter limitSqlAdapter = mainContext.getBean(LimitSqlAdapter.class);
         JdbcPagingListFactory pagingListFactory = new JdbcPagingListFactory(jdbcTemplate, limitSqlAdapter);
@@ -899,6 +900,7 @@ public class LdapMockMvcTests extends TestClassNullifier {
             .param("username", "marissa")
             .param("password", "koaladsada"))
             .andExpect(status().isFound())
+            .andDo(print())
             .andExpect(redirectedUrl("/login?error=login_failure"));
 
         testSuccessfulLogin();
@@ -1056,7 +1058,7 @@ public class LdapMockMvcTests extends TestClassNullifier {
 
         UaaUser authedUser = userDatabase.retrieveUserByEmail("marissa7@user.from.ldap.cf", LDAP);
         assertEquals(createdUser.getId(), authedUser.getId());
-        List<ScimUser> scimUserList = uDB.query(String.format("origin eq '%s'", LDAP));
+        List<ScimUser> scimUserList = uDB.query(String.format("origin eq \"%s\"", LDAP));
         assertEquals(1, scimUserList.size());
         assertEquals("marissa7", authedUser.getUsername());
     }
@@ -1314,15 +1316,13 @@ public class LdapMockMvcTests extends TestClassNullifier {
     public void testStopIfException() throws Exception {
         if (ldapProfile.equals("ldap-simple-bind.xml") && ldapGroup.equals("ldap-groups-null.xml")) {
             ScimUser user = new ScimUser();
-            user.setUserName("user@example.com");
-            user.addEmail("user@example.com");
+            String userName = "user"+new RandomValueStringGenerator().generate()+"@example.com";
+            user.setUserName(userName);
+            user.addEmail(userName);
+            user.setVerified(true);
             user = uDB.createUser(user, "n1cel0ngp455w0rd");
             assertNotNull(user.getId());
-            performAuthentication("user@example.com", "n1cel0ngp455w0rd", HttpStatus.OK);
-
-            AuthzAuthenticationManager authzAuthenticationManager = mainContext.getBean(AuthzAuthenticationManager.class);
-            authzAuthenticationManager.setAllowUnverifiedUsers(false);
-            performAuthentication("user@example.com", "n1cel0ngp455w0rd", HttpStatus.FORBIDDEN);
+            performAuthentication(userName, "n1cel0ngp455w0rd", HttpStatus.OK);
         }
     }
 

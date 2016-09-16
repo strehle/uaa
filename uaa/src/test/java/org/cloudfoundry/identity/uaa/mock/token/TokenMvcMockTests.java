@@ -36,7 +36,6 @@ import org.cloudfoundry.identity.uaa.scim.ScimGroup;
 import org.cloudfoundry.identity.uaa.scim.ScimGroupMember;
 import org.cloudfoundry.identity.uaa.scim.ScimUser;
 import org.cloudfoundry.identity.uaa.scim.bootstrap.ScimUserBootstrap;
-import org.cloudfoundry.identity.uaa.test.TestClient;
 import org.cloudfoundry.identity.uaa.user.UaaAuthority;
 import org.cloudfoundry.identity.uaa.user.UaaUser;
 import org.cloudfoundry.identity.uaa.user.UaaUserDatabase;
@@ -125,9 +124,28 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
+
+    @Test
+    public void test_encoded_char_on_authorize_url() throws Exception {
+        String username = "testuser"+new RandomValueStringGenerator().generate();
+        String userScopes = "uaa.user";
+        ScimUser user = setUpUser(username, userScopes, OriginKeys.UAA, IdentityZone.getUaa().getId());
+
+        getMockMvc().perform(
+            get("/oauth/authorize")
+                .param("client_id", new String(new char[]{'\u0000'}))
+                .session(getAuthenticatedSession(user))
+                .accept(MediaType.TEXT_HTML))
+            .andDo(print())
+            .andExpect(status().isBadRequest())
+            .andExpect(request().attribute("error_message_code", "request.invalid_parameter"));
+
+
+    }
 
     @Test
     public void test_token_ids() throws Exception {
@@ -220,15 +238,7 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
         String userScopes = "uaa.user";
         ScimUser developer = setUpUser(username, userScopes, OriginKeys.UAA, IdentityZone.getUaa().getId());
 
-        UaaPrincipal p = new UaaPrincipal(developer.getId(),developer.getUserName(),developer.getPrimaryEmail(), OriginKeys.UAA,"", IdentityZoneHolder.get().getId());
-        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(p, "", UaaAuthority.USER_AUTHORITIES);
-        Assert.assertTrue(auth.isAuthenticated());
-        SecurityContextHolder.getContext().setAuthentication(auth);
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute(
-                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-                new MockSecurityContext(auth)
-        );
+        MockHttpSession session = getAuthenticatedSession(developer);
 
         String state = new RandomValueStringGenerator().generate();
 
@@ -257,6 +267,19 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
                 .andExpect(status().isOk());
     }
 
+    protected MockHttpSession getAuthenticatedSession(ScimUser user) {
+        UaaPrincipal p = new UaaPrincipal(user.getId(), user.getUserName(), user.getPrimaryEmail(), OriginKeys.UAA, "", IdentityZoneHolder.get().getId());
+        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(p, "", UaaAuthority.USER_AUTHORITIES);
+        Assert.assertTrue(auth.isAuthenticated());
+        SecurityContextHolder.getContext().setAuthentication(auth);
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(
+            HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
+            new MockSecurityContext(auth)
+        );
+        return session;
+    }
+
     @Test
     public void refreshAccessToken_withClient_withAutoApproveField() throws Exception {
         String clientId = "testclient"+new RandomValueStringGenerator().generate();
@@ -271,15 +294,7 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
         String userScopes = "uaa.user,other.scope";
         ScimUser developer = setUpUser(username, userScopes, OriginKeys.UAA, IdentityZone.getUaa().getId());
 
-        UaaPrincipal p = new UaaPrincipal(developer.getId(),developer.getUserName(),developer.getPrimaryEmail(), OriginKeys.UAA,"", IdentityZoneHolder.get().getId());
-        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(p, "", UaaAuthority.USER_AUTHORITIES);
-        Assert.assertTrue(auth.isAuthenticated());
-        SecurityContextHolder.getContext().setAuthentication(auth);
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute(
-          HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-          new MockSecurityContext(auth)
-        );
+        MockHttpSession session = getAuthenticatedSession(developer);
 
         String state = new RandomValueStringGenerator().generate();
 
@@ -417,15 +432,7 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
         String userScopes = "space.1.developer,space.2.developer,org.1.reader,org.2.reader,org.12345.admin,scope.one,scope.two,scope.three,openid";
         ScimUser developer = setUpUser(username, userScopes, OriginKeys.UAA, testZone.getId());
 
-        UaaPrincipal p = new UaaPrincipal(developer.getId(),developer.getUserName(),developer.getPrimaryEmail(), OriginKeys.UAA,"", IdentityZoneHolder.get().getId());
-        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(p, "", UaaAuthority.USER_AUTHORITIES);
-        Assert.assertTrue(auth.isAuthenticated());
-        SecurityContextHolder.getContext().setAuthentication(auth);
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute(
-            HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-            new MockSecurityContext(auth)
-        );
+        MockHttpSession session = getAuthenticatedSession(developer);
 
         String state = new RandomValueStringGenerator().generate();
         IdentityZoneHolder.clear();
@@ -635,16 +642,7 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
             String userScopes = "space.1.developer,space.2.developer,org.1.reader,org.2.reader,org.12345.admin,scope.one,scope.two,scope.three,openid";
             ScimUser developer = setUpUser(username, userScopes, OriginKeys.UAA, IdentityZoneHolder.get().getId());
 
-            UaaPrincipal p = new UaaPrincipal(developer.getId(), developer.getUserName(), developer.getPrimaryEmail(), OriginKeys.UAA, "", IdentityZoneHolder.get().getId());
-            UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(p, "", UaaAuthority.USER_AUTHORITIES);
-            Assert.assertTrue(auth.isAuthenticated());
-
-            SecurityContextHolder.getContext().setAuthentication(auth);
-            MockHttpSession session = new MockHttpSession();
-            session.setAttribute(
-                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-                new MockSecurityContext(auth)
-            );
+            MockHttpSession session = getAuthenticatedSession(developer);
 
             String state = new RandomValueStringGenerator().generate();
 
@@ -679,16 +677,7 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
         String userScopes = "space.1.developer,space.2.developer,org.1.reader,org.2.reader,org.12345.admin,scope.one,scope.two,scope.three,openid";
         ScimUser developer = setUpUser(username, userScopes, OriginKeys.UAA, IdentityZoneHolder.get().getId());
 
-        UaaPrincipal p = new UaaPrincipal(developer.getId(),developer.getUserName(),developer.getPrimaryEmail(), OriginKeys.UAA,"", IdentityZoneHolder.get().getId());
-        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(p, "", UaaAuthority.USER_AUTHORITIES);
-        Assert.assertTrue(auth.isAuthenticated());
-
-        SecurityContextHolder.getContext().setAuthentication(auth);
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute(
-            HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-            new MockSecurityContext(auth)
-        );
+        MockHttpSession session = getAuthenticatedSession(developer);
 
         String state = new RandomValueStringGenerator().generate();
 
@@ -719,16 +708,7 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
         String userScopes = "space.1.developer,space.2.developer,org.1.reader,org.2.reader,org.12345.admin,scope.one,scope.two,scope.three,openid";
         ScimUser developer = setUpUser(username, userScopes, OriginKeys.UAA, IdentityZoneHolder.get().getId());
 
-        UaaPrincipal p = new UaaPrincipal(developer.getId(),developer.getUserName(),developer.getPrimaryEmail(), OriginKeys.UAA,"", IdentityZoneHolder.get().getId());
-        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(p, "", UaaAuthority.USER_AUTHORITIES);
-        Assert.assertTrue(auth.isAuthenticated());
-
-        SecurityContextHolder.getContext().setAuthentication(auth);
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute(
-                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-                new MockSecurityContext(auth)
-        );
+        MockHttpSession session = getAuthenticatedSession(developer);
 
         String state = new RandomValueStringGenerator().generate();
         AuthorizationRequest authorizationRequest = new AuthorizationRequest();
@@ -764,16 +744,7 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
         String userScopes = "space.1.developer,space.2.developer,org.1.reader,org.2.reader,org.12345.admin,scope.one,scope.two,scope.three,openid";
         ScimUser developer = setUpUser(username, userScopes, OriginKeys.UAA, IdentityZoneHolder.get().getId());
 
-        UaaPrincipal p = new UaaPrincipal(developer.getId(),developer.getUserName(),developer.getPrimaryEmail(), OriginKeys.UAA,"", IdentityZoneHolder.get().getId());
-        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(p, "", UaaAuthority.USER_AUTHORITIES);
-        Assert.assertTrue(auth.isAuthenticated());
-
-        SecurityContextHolder.getContext().setAuthentication(auth);
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute(
-                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-                new MockSecurityContext(auth)
-        );
+        MockHttpSession session = getAuthenticatedSession(developer);
 
         String state = new RandomValueStringGenerator().generate();
 
@@ -813,16 +784,7 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
         ScimUser developer = setUpUser(username, userScopes, OriginKeys.UAA, IdentityZoneHolder.get().getId());
         String basicDigestHeaderValue = "Basic "
             + new String(org.apache.commons.codec.binary.Base64.encodeBase64((clientId + ":" + SECRET).getBytes()));
-        UaaPrincipal p = new UaaPrincipal(developer.getId(),developer.getUserName(),developer.getPrimaryEmail(), OriginKeys.UAA,"", IdentityZoneHolder.get().getId());
-        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(p, "", UaaAuthority.USER_AUTHORITIES);
-        Assert.assertTrue(auth.isAuthenticated());
-
-        SecurityContextHolder.getContext().setAuthentication(auth);
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute(
-            HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-            new MockSecurityContext(auth)
-        );
+        MockHttpSession session = getAuthenticatedSession(developer);
 
         String state = new RandomValueStringGenerator().generate();
         MockHttpServletRequestBuilder authRequest = get("/oauth/authorize")
@@ -852,16 +814,7 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
         ScimUser developer = setUpUser(username, userScopes, OriginKeys.UAA, IdentityZoneHolder.get().getId());
         String basicDigestHeaderValue = "Basic "
             + new String(org.apache.commons.codec.binary.Base64.encodeBase64((clientId + ":" + SECRET).getBytes()));
-        UaaPrincipal p = new UaaPrincipal(developer.getId(),developer.getUserName(),developer.getPrimaryEmail(), OriginKeys.UAA,"", IdentityZoneHolder.get().getId());
-        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(p, "", UaaAuthority.USER_AUTHORITIES);
-        Assert.assertTrue(auth.isAuthenticated());
-
-        SecurityContextHolder.getContext().setAuthentication(auth);
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute(
-            HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-            new MockSecurityContext(auth)
-        );
+        MockHttpSession session = getAuthenticatedSession(developer);
 
         String state = new RandomValueStringGenerator().generate();
         MockHttpServletRequestBuilder authRequest = get("/oauth/authorize")
@@ -966,16 +919,7 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
         ScimUser developer = setUpUser(username, userScopes, OriginKeys.UAA, IdentityZoneHolder.get().getId());
         String basicDigestHeaderValue = "Basic "
             + new String(org.apache.commons.codec.binary.Base64.encodeBase64((clientId + ":" + SECRET).getBytes()));
-        UaaPrincipal p = new UaaPrincipal(developer.getId(),developer.getUserName(),developer.getPrimaryEmail(), OriginKeys.UAA,"", IdentityZoneHolder.get().getId());
-        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(p, "", UaaAuthority.USER_AUTHORITIES);
-        Assert.assertTrue(auth.isAuthenticated());
-
-        SecurityContextHolder.getContext().setAuthentication(auth);
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute(
-            HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-            new MockSecurityContext(auth)
-        );
+        MockHttpSession session = getAuthenticatedSession(developer);
 
 
         String requestedUri = "https://subdomain.domain.com/path1/path2?query1=value1";
@@ -1021,16 +965,7 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
         ScimUser developer = setUpUser(username, userScopes, OriginKeys.UAA, IdentityZoneHolder.get().getId());
         String basicDigestHeaderValue = "Basic "
             + new String(org.apache.commons.codec.binary.Base64.encodeBase64((clientId + ":" + SECRET).getBytes()));
-        UaaPrincipal p = new UaaPrincipal(developer.getId(),developer.getUserName(),developer.getPrimaryEmail(), OriginKeys.UAA,"", IdentityZoneHolder.get().getId());
-        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(p, "", UaaAuthority.USER_AUTHORITIES);
-        Assert.assertTrue(auth.isAuthenticated());
-
-        SecurityContextHolder.getContext().setAuthentication(auth);
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute(
-            HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-            new MockSecurityContext(auth)
-        );
+        MockHttpSession session = getAuthenticatedSession(developer);
 
         String state = new RandomValueStringGenerator().generate();
         MockHttpServletRequestBuilder authRequest = get("/oauth/authorize")
@@ -2587,17 +2522,7 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
         ScimGroupMember member = new ScimGroupMember(user.getId());
         groupMembershipManager.addMember(group.getId(),member);
 
-        UaaPrincipal p = new UaaPrincipal(user.getId(),user.getUserName(),user.getPrimaryEmail(), OriginKeys.UAA,"", IdentityZoneHolder.get().getId());
-        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(p, "", UaaAuthority.USER_AUTHORITIES);
-
-        Assert.assertTrue(auth.isAuthenticated());
-
-        SecurityContextHolder.getContext().setAuthentication(auth);
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute(
-            HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-            new MockSecurityContext(auth)
-        );
+        MockHttpSession session = getAuthenticatedSession(user);
 
 
         String state = new RandomValueStringGenerator().generate();
@@ -2625,7 +2550,7 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
             .param(OAuth2Utils.CLIENT_ID, "identity")
             .param(OAuth2Utils.REDIRECT_URI, "http://localhost/test");
         result = getMockMvc().perform(authRequest).andExpect(status().is2xxSuccessful()).andReturn();
-        TestClient.OAuthToken oauthToken = JsonUtils.readValue(result.getResponse().getContentAsString(), TestClient.OAuthToken.class);
+        OAuthToken oauthToken = JsonUtils.readValue(result.getResponse().getContentAsString(), OAuthToken.class);
 
         OAuth2Authentication a1 = tokenServices.loadAuthentication(oauthToken.accessToken);
 
@@ -2729,7 +2654,7 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
         }
     }
 
-    protected void validateRevocableJwtToken(Map<String, Object> tokenResponse, IdentityZone zone) {
+    protected void validateRevocableJwtToken(Map<String, Object> tokenResponse, IdentityZone zone) throws Exception {
         String tokenKey = "access_token";
         assertNotNull("Token must be present", tokenResponse.get(tokenKey));
         assertTrue("Token must be a string", tokenResponse.get(tokenKey) instanceof String);
