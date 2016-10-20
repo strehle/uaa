@@ -95,6 +95,7 @@ public class IdentityProviderEndpointsDocs extends InjectedMockContextTest {
     private static final String PHONE_NUMBER_DESC = "Map `phone_number` to the attribute for phone number in the provider assertion.";
     private static final String GIVEN_NAME_DESC = "Map `given_name` to the attribute for given name in the provider assertion.";
 
+    private static final FieldDescriptor SKIP_SSL_VALIDATION = fieldWithPath("config.skipSslValidation").optional(false).type(BOOLEAN).description("Set to true, to skip SSL validation when fetching metadata.");
     private static final FieldDescriptor ATTRIBUTE_MAPPING = fieldWithPath("config.attributeMappings").optional(null).type(STRING).description("Map external attribute to UAA recognized mappings.");
     private static final FieldDescriptor ADD_SHADOW_USER = fieldWithPath("config.addShadowUserOnLogin").optional(true).description("Whether users should be allowed to authenticate from LDAP without having a user pre-populated in the users database");
     private static final FieldDescriptor GIVEN_NAME = fieldWithPath("config.attributeMappings.given_name").optional(null).type(STRING).description(GIVEN_NAME_DESC);
@@ -150,7 +151,7 @@ public class IdentityProviderEndpointsDocs extends InjectedMockContextTest {
     private final FieldDescriptor LDAP_BIND_PASSWORD = fieldWithPath("config.bindPassword").required().type(STRING).description("Used with `search-and-bind` and `search-and-compare`. Password for the LDAP ID that performs a search of the LDAP tree for user information.");
     private final FieldDescriptor LDAP_USER_SEARCH_BASE = fieldWithPath("config.userSearchBase").optional("dc=test,dc=com").type(STRING).description("Used with `search-and-bind` and `search-and-compare`. Define a base where the search starts at.");
     private final FieldDescriptor LDAP_USER_SEARCH_FILTER = fieldWithPath("config.userSearchFilter").optional("cn={0}").type(STRING).description("Used with `search-and-bind` and `search-and-compare`. Search filter used. Takes one parameter, user ID defined as `{0}`");
-    private final FieldDescriptor LDAP_GROUP_SEARCH_BASE = fieldWithPath("config.groupSearchBase").required().type(STRING).description("Search start point for a user group membership search");
+    private final FieldDescriptor LDAP_GROUP_SEARCH_BASE = fieldWithPath("config.groupSearchBase").required().type(STRING).description("Search start point for a user group membership search, use the value `memberOf` to skip group search, and use the memberOf attributes of the user.");
     private final FieldDescriptor LDAP_GROUP_SEARCH_FILTER = fieldWithPath("config.groupSearchFilter").required().type(STRING).description("Search query filter to find the groups a user belongs to, or for a nested search, groups that a group belongs to");
     private final FieldDescriptor LDAP_GROUP_AUTO_ADD = fieldWithPath("config.autoAddGroups").optional(true).type(BOOLEAN).description("Set to true when `profile_type=groups_as_scopes` to auto create scopes for a user. Ignored for other profiles.");
     private final FieldDescriptor LDAP_GROUP_SEARCH_SUBTREE = fieldWithPath("config.groupSearchSubTree").optional(true).type(BOOLEAN).description("Boolean value, set to true to search below the search base");
@@ -343,6 +344,7 @@ public class IdentityProviderEndpointsDocs extends InjectedMockContextTest {
         FieldDescriptor[] idempotentFields = (FieldDescriptor[]) ArrayUtils.addAll(commonProviderFields, new FieldDescriptor[]{
             fieldWithPath("type").required().description("`saml`"),
             fieldWithPath("originKey").required().description("A unique alias for the SAML provider"),
+            SKIP_SSL_VALIDATION,
             fieldWithPath("config.metaDataLocation").required().type(STRING).description("SAML Metadata - either an XML string or a URL that will deliver XML content"),
             fieldWithPath("config.nameID").optional(null).type(STRING).description("The name ID to use for the username, default is \"urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified\"."),
             fieldWithPath("config.assertionConsumerIndex").optional(null).type(NUMBER).description("SAML assertion consumer index, default is 0"),

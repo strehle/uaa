@@ -77,6 +77,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -154,7 +155,6 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
     private ApprovalStore approvalStore = null;
 
     private ApplicationEventPublisher applicationEventPublisher;
-    private String host;
 
     private List<String> validIdTokenScopes = Arrays.asList("openid");
     private TokenPolicy tokenPolicy;
@@ -293,7 +293,11 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
 
         String revocableHashSignature = (String)claims.get(REVOCATION_SIGNATURE);
         if (hasText(revocableHashSignature)) {
-            String newRevocableHashSignature = UaaTokenUtils.getRevocableTokenSignature(client, user);
+            String clientSecretForHash = client.getClientSecret();
+            if(clientSecretForHash != null && clientSecretForHash.split(" ").length > 1){
+                clientSecretForHash = clientSecretForHash.split(" ")[1];
+            }
+            String newRevocableHashSignature = UaaTokenUtils.getRevocableTokenSignature(client, clientSecretForHash, user);
             if (!revocableHashSignature.equals(newRevocableHashSignature)) {
                 throw new TokenRevokedException(refreshTokenValue);
             }
@@ -625,7 +629,11 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
         }
 
         ClientDetails client = clientDetailsService.loadClientByClientId(authentication.getOAuth2Request().getClientId());
-        String revocableHashSignature = UaaTokenUtils.getRevocableTokenSignature(client, user);
+        String clientSecretForHash = client.getClientSecret();
+        if(clientSecretForHash != null && clientSecretForHash.split(" ").length > 1){
+            clientSecretForHash = clientSecretForHash.split(" ")[1];
+        }
+        String revocableHashSignature = UaaTokenUtils.getRevocableTokenSignature(client, clientSecretForHash, user);
 
         String tokenId = generateUniqueTokenId();
         String refreshTokenId = generateUniqueTokenId() + REFRESH_TOKEN_SUFFIX;
@@ -640,13 +648,7 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
         Set<String> userScopes = authentication.getOAuth2Request().getScope();
         String grantType = authentication.getOAuth2Request().getRequestParameters().get("grant_type");
 
-        Set<String> modifiableUserScopes = new LinkedHashSet<String>();
-        modifiableUserScopes.addAll(userScopes);
-        String externalScopes = authentication.getOAuth2Request().getRequestParameters()
-                        .get("external_scopes");
-        if (null != externalScopes && StringUtils.hasLength(externalScopes)) {
-            modifiableUserScopes.addAll(OAuth2Utils.parseParameterList(externalScopes));
-        }
+        Set<String> modifiableUserScopes = new LinkedHashSet<>(userScopes);
 
         Set<String> externalGroupsForIdToken = Collections.EMPTY_SET;
         Map<String,List<String>> userAttributesForIdToken = Collections.EMPTY_MAP;
@@ -986,12 +988,11 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
     }
 
     @Override
-    public void afterPropertiesSet() throws Exception {
+    public void afterPropertiesSet() throws URISyntaxException {
         Assert.notNull(clientDetailsService, "clientDetailsService must be set");
         Assert.notNull(issuer, "issuer must be set");
         Assert.notNull(approvalStore, "approvalStore must be set");
-        URI uri = new URI(issuer);
-        host = uri.getHost();
+        new URI(issuer); //assert the issuer is a valid url at startup.
     }
 
     public void setUserDatabase(UaaUserDatabase userDatabase) {
@@ -1175,9 +1176,21 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
 
         tokenValidation.checkRevocableTokenStore(tokenProvisioning).throwIfInvalid();
 
-        String currentRevocationSignature = UaaTokenUtils.getRevocableTokenSignature(client, user);
-        tokenValidation.checkRevocationSignature(currentRevocationSignature).throwIfInvalid();
+        List<String> clientSecrets = new ArrayList<>();
+        List<String> revocationSignatureList = new ArrayList<>();
+        if (client.getClientSecret() != null) {
+            clientSecrets.addAll(Arrays.asList(client.getClientSecret().split(" ")));
+        } else {
+            revocationSignatureList.add(UaaTokenUtils.getRevocableTokenSignature(client, null, user));
+        }
 
+        for (String clientSecret : clientSecrets) {
+            revocationSignatureList.add(UaaTokenUtils.getRevocableTokenSignature(client, clientSecret, user));
+        }
+
+        tokenValidation = tokenValidation.checkRevocationSignature(revocationSignatureList);
+
+        tokenValidation.throwIfInvalid();
         return tokenValidation;
     }
 
@@ -1190,19 +1203,18 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
         return null;
     }
 
-    public void setIssuer(String issuer) {
+    public void setIssuer(String issuer) throws URISyntaxException {
+        Assert.notNull(issuer);
+        UaaTokenUtils.constructTokenEndpointUrl(issuer);
         this.issuer = issuer;
     }
 
     public String getTokenEndpoint() {
-        if (issuer==null) {
-            return null;
-        } else {
-            String hostToUse = host;
-            if (hasText(IdentityZoneHolder.get().getSubdomain())) {
-                hostToUse = IdentityZoneHolder.get().getSubdomain() + "." + host;
-            }
-            return UriComponentsBuilder.fromUriString(issuer).host(hostToUse).pathSegment("oauth/token").build().toUriString();
+        try {
+            return UaaTokenUtils.constructTokenEndpointUrl(issuer);
+        } catch (URISyntaxException e) {
+            logger.error("Failed to get token endpoint for issuer " + issuer, e);
+            throw new IllegalArgumentException(e);
         }
     }
 

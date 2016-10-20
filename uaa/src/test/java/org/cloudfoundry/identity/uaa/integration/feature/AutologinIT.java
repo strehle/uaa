@@ -17,6 +17,7 @@ import org.cloudfoundry.identity.uaa.test.UaaTestAccounts;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -73,32 +74,44 @@ public class AutologinIT {
 
     private UaaTestAccounts testAccounts = UaaTestAccounts.standard(null);
 
+    LinkedMultiValueMap<String, String> map = new LinkedMultiValueMap<>();
+
+
     @Before
     @After
     public void logout_and_clear_cookies() {
+        map.add("username", testAccounts.getUserName());
+        map.add("password", testAccounts.getPassword());
         try {
             webDriver.get(baseUrl + "/logout.do");
         }catch (org.openqa.selenium.TimeoutException x) {
             //try again - this should not be happening - 20 second timeouts
             webDriver.get(baseUrl + "/logout.do");
         }
+        webDriver.manage().deleteAllCookies();
         webDriver.get(appUrl+"/j_spring_security_logout");
         webDriver.manage().deleteAllCookies();
     }
 
     @Test
-    public void testAutologinFlow() throws Exception {
+    public void testAutologinFlow_FORM() throws Exception {
+        testAutologinFlow(MediaType.APPLICATION_FORM_URLENCODED_VALUE, map);
+    }
+
+    @Test
+    public void testAutologinFlow_JSON() throws Exception {
+        testAutologinFlow(MediaType.APPLICATION_JSON_VALUE, map.toSingleValueMap());
+    }
+    public void testAutologinFlow(String contentType, Map body) throws Exception {
         webDriver.get(baseUrl + "/logout.do");
-
         HttpHeaders headers = getAppBasicAuthHttpHeaders();
+        headers.add(HttpHeaders.CONTENT_TYPE, contentType);
 
-        Map<String, String> requestBody = new HashMap<>();
-        requestBody.put("username", testAccounts.getUserName());
-        requestBody.put("password", testAccounts.getPassword());
+
 
         ResponseEntity<Map> autologinResponseEntity = restOperations.exchange(baseUrl + "/autologin",
                 HttpMethod.POST,
-                new HttpEntity<>(requestBody, headers),
+                new HttpEntity<>(body, headers),
                 Map.class);
         String autologinCode = (String) autologinResponseEntity.getBody().get("code");
 
@@ -116,6 +129,7 @@ public class AutologinIT {
         webDriver.get(baseUrl);
 
         Assert.assertEquals(testAccounts.getUserName(), webDriver.findElement(By.cssSelector(".header .nav")).getText());
+        IntegrationTestUtils.validateAccountChooserCookie(baseUrl, webDriver);
     }
 
     @Test
@@ -156,10 +170,15 @@ public class AutologinIT {
 
         //we are now logged in. retrieve the JSESSIONID
         List<String> cookies = authorizeResponse.getHeaders().get("Set-Cookie");
-        assertEquals(2, cookies.size());
+        int cookiesAdded = 0;
         headers = getAppBasicAuthHttpHeaders();
-        headers.add("Cookie", cookies.get(0));
-        headers.add("Cookie", cookies.get(1));
+        for (String cookie : cookies) {
+            if (cookie.startsWith("X-Uaa-Csrf=") || cookie.startsWith("JSESSIONID=")) {
+                headers.add("Cookie", cookie);
+                cookiesAdded++;
+            }
+        }
+        assertEquals(2, cookiesAdded);
 
         //if we receive a 200, then we must approve our scopes
         if (HttpStatus.OK == authorizeResponse.getStatusCode()) {
@@ -199,7 +218,7 @@ public class AutologinIT {
         //here we must reset our state. we do that by following the logout flow.
         headers.clear();
 
-        headers.set(headers.ACCEPT, MediaType.TEXT_HTML_VALUE);
+        headers.set(HttpHeaders.ACCEPT, MediaType.TEXT_HTML_VALUE);
         ResponseEntity<String> loginResponse = template.exchange(baseUrl + "/login",
                                                                  HttpMethod.GET,
                                                                  new HttpEntity<>(null, headers),
@@ -219,10 +238,10 @@ public class AutologinIT {
                                                 new HttpEntity<>(requestBody, headers),
                                                 String.class);
         cookies = loginResponse.getHeaders().get("Set-Cookie");
-        assertEquals(4, cookies.size());
         assertThat(cookies, hasItem(startsWith("JSESSIONID")));
         assertThat(cookies, hasItem(startsWith("X-Uaa-Csrf")));
         assertThat(cookies, hasItem(startsWith("Saved-Account-")));
+        assertThat(cookies, hasItem(startsWith("Current-User")));
         headers.clear();
         for (String cookie : loginResponse.getHeaders().get("Set-Cookie")) {
             if (!cookie.contains("1970")) { //deleted cookie

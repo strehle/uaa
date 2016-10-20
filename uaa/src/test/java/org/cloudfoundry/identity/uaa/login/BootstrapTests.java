@@ -12,8 +12,6 @@
  *******************************************************************************/
 package org.cloudfoundry.identity.uaa.login;
 
-import org.apache.commons.httpclient.contrib.ssl.EasySSLProtocolSocketFactory;
-import org.apache.commons.httpclient.protocol.DefaultProtocolSocketFactory;
 import org.apache.tomcat.jdbc.pool.DataSource;
 import org.cloudfoundry.identity.uaa.account.ResetPasswordController;
 import org.cloudfoundry.identity.uaa.authentication.manager.AuthzAuthenticationManager;
@@ -36,7 +34,6 @@ import org.cloudfoundry.identity.uaa.provider.PasswordPolicy;
 import org.cloudfoundry.identity.uaa.provider.SamlIdentityProviderDefinition;
 import org.cloudfoundry.identity.uaa.provider.UaaIdentityProviderDefinition;
 import org.cloudfoundry.identity.uaa.provider.saml.BootstrapSamlIdentityProviderConfigurator;
-import org.cloudfoundry.identity.uaa.provider.saml.SamlConfigurationBean;
 import org.cloudfoundry.identity.uaa.provider.saml.ZoneAwareMetadataGenerator;
 import org.cloudfoundry.identity.uaa.resources.jdbc.SimpleSearchQueryConverter;
 import org.cloudfoundry.identity.uaa.scim.ScimGroup;
@@ -46,6 +43,7 @@ import org.cloudfoundry.identity.uaa.user.JdbcUaaUserDatabase;
 import org.cloudfoundry.identity.uaa.util.CachingPasswordEncoder;
 import org.cloudfoundry.identity.uaa.util.PredicateMatcher;
 import org.cloudfoundry.identity.uaa.web.UaaSessionCookieConfig;
+import org.cloudfoundry.identity.uaa.zone.CorsConfiguration;
 import org.cloudfoundry.identity.uaa.zone.IdentityZone;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneConfiguration;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
@@ -281,7 +279,7 @@ public class BootstrapTests {
 
         ZoneAwareMetadataGenerator zoneAwareMetadataGenerator = context.getBean(ZoneAwareMetadataGenerator.class);
         assertTrue(zoneAwareMetadataGenerator.isRequestSigned());
-        assertFalse(zoneAwareMetadataGenerator.isWantAssertionSigned());
+        assertTrue(zoneAwareMetadataGenerator.isWantAssertionSigned());
 
         CorsFilter corFilter = context.getBean(CorsFilter.class);
 
@@ -302,7 +300,7 @@ public class BootstrapTests {
         assertThat(corFilter.getDefaultConfiguration().getAllowedOrigins(), containsInAnyOrder(".*"));
 
         assertThat(corFilter.getXhrConfiguration().getAllowedMethods(), containsInAnyOrder("OPTIONS", "GET"));
-        assertThat(corFilter.getDefaultConfiguration().getAllowedMethods(), containsInAnyOrder("OPTIONS", "GET", "POST", "PUT", "DELETE"));
+        assertThat(corFilter.getDefaultConfiguration().getAllowedMethods(), containsInAnyOrder("OPTIONS", "GET", "POST", "PUT", "DELETE", "PATCH"));
 
         assertTrue(corFilter.getXhrConfiguration().isAllowedCredentials());
         assertFalse(corFilter.getDefaultConfiguration().isAllowedCredentials());
@@ -359,6 +357,8 @@ public class BootstrapTests {
         assertEquals(SamlLoginServerKeyManagerTests.PASSWORD.trim(), zoneConfiguration.getSamlConfig().getPrivateKeyPassword().trim());
 
         assertTrue(context.getBean(IdentityZoneProvisioning.class).retrieve(IdentityZone.getUaa().getId()).getConfig().getTokenPolicy().isJwtRevocable());
+        ZoneAwareMetadataGenerator zoneAwareMetadataGenerator = context.getBean(ZoneAwareMetadataGenerator.class);
+        assertFalse(zoneAwareMetadataGenerator.isWantAssertionSigned());
 
         assertEquals(
             Arrays.asList(
@@ -615,13 +615,18 @@ public class BootstrapTests {
         IdentityProvider<SamlIdentityProviderDefinition> samlProvider = providerProvisioning.retrieveByOrigin("okta-local", IdentityZone.getUaa().getId());
         assertEquals("Test Okta Preview 1 Description", samlProvider.getConfig().getProviderDescription());
         assertEquals(SamlIdentityProviderDefinition.ExternalGroupMappingMode.EXPLICITLY_MAPPED, samlProvider.getConfig().getGroupMappingMode());
+        assertTrue(samlProvider.getConfig().isSkipSslValidation());
 
         IdentityProvider<SamlIdentityProviderDefinition> samlProvider2 = providerProvisioning.retrieveByOrigin("okta-local-2", IdentityZone.getUaa().getId());
         assertEquals(SamlIdentityProviderDefinition.ExternalGroupMappingMode.AS_SCOPES, samlProvider2.getConfig().getGroupMappingMode());
+        assertFalse(samlProvider2.getConfig().isSkipSslValidation());
+
+        IdentityProvider<SamlIdentityProviderDefinition> samlProvider3 = providerProvisioning.retrieveByOrigin("vsphere.local", IdentityZone.getUaa().getId());
+        assertTrue(samlProvider3.getConfig().isSkipSslValidation());
 
         CorsFilter filter = context.getBean(CorsFilter.class);
 
-        for (CorsFilter.CorsConfiguration configuration : Arrays.asList(filter.getXhrConfiguration(), filter.getDefaultConfiguration())) {
+        for (CorsConfiguration configuration : Arrays.asList(filter.getXhrConfiguration(), filter.getDefaultConfiguration())) {
             assertEquals(1999999, configuration.getMaxAge());
             assertEquals(1, configuration.getAllowedUris().size());
             assertEquals(".*token$", configuration.getAllowedUris().get(0));
@@ -675,10 +680,6 @@ public class BootstrapTests {
             SamlIdentityProviderDefinition.MetadataLocation.URL,
             findProvider(defs, "testIDPFile").getType());
         assertEquals(
-            DefaultProtocolSocketFactory.class.getName(),
-            findProvider(defs, "testIDPFile").getSocketFactoryClassName()
-        );
-        assertEquals(
             SamlIdentityProviderDefinition.MetadataLocation.URL,
             defs.get(defs.size() - 1).getType()
         );
@@ -709,7 +710,8 @@ public class BootstrapTests {
     @Test
     public void testLegacySamlProfileHttpsMetaUrl() throws Exception {
         System.setProperty("login.saml.metadataTrustCheck", "false");
-        System.setProperty("login.idpMetadataURL", "https://simplesamlphp.identity.cf-app.com:443/saml2/idp/metadata.php");
+        System.setProperty("login.saml.metadataTrustCheck", "false");
+        System.setProperty("login.idpMetadataURL", "http://simplesamlphp.identity.cf-app.com:80/saml2/idp/metadata.php");
         System.setProperty("login.idpEntityAlias", "testIDPUrl");
 
         context = getServletContext("default", "login.yml","uaa.yml", "file:./src/main/webapp/WEB-INF/spring-servlet.xml");
@@ -717,8 +719,7 @@ public class BootstrapTests {
         assertNotNull(context.getBean("samlLogger", SAMLDefaultLogger.class));
         assertFalse(context.getBean(BootstrapSamlIdentityProviderConfigurator.class).isLegacyMetadataTrustCheck());
         List<SamlIdentityProviderDefinition> defs = context.getBean(BootstrapSamlIdentityProviderConfigurator.class).getIdentityProviderDefinitions();
-        assertEquals(
-            EasySSLProtocolSocketFactory.class.getName(),
+        assertNull(
             defs.get(defs.size() - 1).getSocketFactoryClassName()
         );
         assertEquals(
@@ -731,7 +732,7 @@ public class BootstrapTests {
     @Test
     public void testLegacySamlProfileHttpsMetaUrlWithoutPort() throws Exception {
         System.setProperty("login.saml.metadataTrustCheck", "false");
-        System.setProperty("login.idpMetadataURL", "https://simplesamlphp.identity.cf-app.com/saml2/idp/metadata.php");
+        System.setProperty("login.idpMetadataURL", "http://simplesamlphp.identity.cf-app.com/saml2/idp/metadata.php");
         System.setProperty("login.idpEntityAlias", "testIDPUrl");
 
         context = getServletContext("default", "login.yml","uaa.yml", "file:./src/main/webapp/WEB-INF/spring-servlet.xml");
@@ -742,8 +743,7 @@ public class BootstrapTests {
         assertFalse(
             context.getBean(BootstrapSamlIdentityProviderConfigurator.class).getIdentityProviderDefinitions().isEmpty()
         );
-        assertEquals(
-            EasySSLProtocolSocketFactory.class.getName(),
+        assertNull(
             defs.get(defs.size() - 1).getSocketFactoryClassName()
         );
         assertEquals(

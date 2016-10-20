@@ -90,6 +90,7 @@
     <sec:http name="secFilterOpen15" pattern="/saml_error" security="none" />
     <sec:http name="secFilterOpen16" pattern="/favicon.ico" security="none" />
     <sec:http name="secFilterOpen17" pattern="/oauth_error" security="none" />
+    <sec:http name="secFilterOpen18" pattern="/session" security="none" />
 
     <bean id="oauth2TokenParseFilter" class="java.lang.Class" factory-method="forName">
         <constructor-arg value="org.springframework.security.oauth2.provider.authentication.OAuth2AuthenticationProcessingFilter"/>
@@ -118,10 +119,10 @@
                            @config['cors']['default']['allowed']['headers']}"/>
 
         <property name="corsAllowedMethods"
-                  value="#{@config['cors']==null ? T(java.util.Arrays).asList('GET','POST','PUT','OPTIONS','DELETE') :
-                           @config['cors']['default']==null ? T(java.util.Arrays).asList('GET','POST','PUT','OPTIONS','DELETE') :
-                           @config['cors']['default']['allowed']==null ? T(java.util.Arrays).asList('GET','POST','PUT','OPTIONS','DELETE') :
-                           @config['cors']['default']['allowed']['methods']==null ? T(java.util.Arrays).asList('GET','POST','PUT','OPTIONS','DELETE') :
+                  value="#{@config['cors']==null ? T(java.util.Arrays).asList('GET','POST','PUT','OPTIONS','DELETE','PATCH') :
+                           @config['cors']['default']==null ? T(java.util.Arrays).asList('GET','POST','PUT','OPTIONS','DELETE','PATCH') :
+                           @config['cors']['default']['allowed']==null ? T(java.util.Arrays).asList('GET','POST','PUT','OPTIONS','DELETE','PATCH') :
+                           @config['cors']['default']['allowed']['methods']==null ? T(java.util.Arrays).asList('GET','POST','PUT','OPTIONS','DELETE','PATCH') :
                            @config['cors']['default']['allowed']['methods']}"/>
 
 

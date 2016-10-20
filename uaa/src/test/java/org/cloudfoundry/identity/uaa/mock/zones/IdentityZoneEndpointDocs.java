@@ -76,6 +76,15 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
     private static final String BRANDING_FOOTER_LEGAL_TEXT_DESC = "This text appears on the footer of all UAA pages";
     private static final String BRANDING_FOOTER_LINKS_DESC = "These links appear on the footer of all UAA pages. You may choose to add multiple urls for things like Support, Terms of Service etc.";
 
+    private static final String CORS_XHR_ORIGINS_DESC = "`Access-Control-Allow-Origin header`. Indicates whether a resource can be shared based by returning the value of the Origin request header, \"*\", or \"null\" in the response.";
+    private static final String CORS_XHR_ORIGIN_PATTERNS_DESC = "Indicates whether a resource can be shared based by returning the value of the Origin patterns.";
+    private static final String CORS_XHR_URI_DESC = "The list of allowed URIs.";
+    private static final String CORS_XHR_URI_PATTERNS_DESC = "The list of allowed URI patterns.";
+    private static final String CORS_XHR_HEADERS_DESC = "`Access-Control-Allow-Headers` header. Indicates which header field names can be used during the actual response";
+    private static final String CORS_XHR_METHODS_DESC = "`Access-Control-Allow-Methods` header. Indicates which method will be used in the actual request as part of the preflight request.";
+    private static final String CORS_XHR_CREDENTIALS_DESC = "`Access-Control-Allow-Credentials` header. Indicates whether the response to request can be exposed when the omit credentials flag is unset. When part of the response to a preflight request it indicates that the actual request can include user credentials..";
+    private static final String CORS_XHR_MAXAGE_DESC = "`Access-Control-Max-Age` header. Indicates how long the results of a preflight request can be cached in a preflight result cache";
+
     @Before
     public void setUp() throws Exception {
     }
@@ -142,6 +151,25 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
             fieldWithPath("config.branding.squareLogo").description(BRANDING_SQUARE_LOGO_DESC).attributes(key("constraints").value("Optional")),
             fieldWithPath("config.branding.footerLegalText").description(BRANDING_FOOTER_LEGAL_TEXT_DESC).attributes(key("constraints").value("Optional")),
             fieldWithPath("config.branding.footerLinks").description(BRANDING_FOOTER_LINKS_DESC).attributes(key("constraints").value("Optional")),
+
+            fieldWithPath("config.corsPolicy.xhrConfiguration.allowedOrigins").description(CORS_XHR_ORIGINS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.xhrConfiguration.allowedOriginPatterns").description(CORS_XHR_ORIGIN_PATTERNS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.xhrConfiguration.allowedUris").description(CORS_XHR_URI_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.xhrConfiguration.allowedUriPatterns").description(CORS_XHR_URI_PATTERNS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.xhrConfiguration.allowedHeaders").description(CORS_XHR_HEADERS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.xhrConfiguration.allowedMethods").description(CORS_XHR_METHODS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.xhrConfiguration.allowedCredentials").description(CORS_XHR_CREDENTIALS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.xhrConfiguration.maxAge").description(CORS_XHR_MAXAGE_DESC).attributes(key("constraints").value("Optional")),
+
+            fieldWithPath("config.corsPolicy.defaultConfiguration.allowedOrigins").description(CORS_XHR_ORIGINS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.defaultConfiguration.allowedOriginPatterns").description(CORS_XHR_ORIGIN_PATTERNS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.defaultConfiguration.allowedUris").description(CORS_XHR_URI_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.defaultConfiguration.allowedUriPatterns").description(CORS_XHR_URI_PATTERNS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.defaultConfiguration.allowedHeaders").description(CORS_XHR_HEADERS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.defaultConfiguration.allowedMethods").description(CORS_XHR_METHODS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.defaultConfiguration.allowedCredentials").description(CORS_XHR_CREDENTIALS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.defaultConfiguration.maxAge").description(CORS_XHR_MAXAGE_DESC).attributes(key("constraints").value("Optional")),
+
 
             fieldWithPath("created").ignored(),
             fieldWithPath("last_modified").ignored()
@@ -247,6 +275,24 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
             fieldWithPath("[].config.branding.footerLegalText").description(BRANDING_FOOTER_LEGAL_TEXT_DESC).attributes(key("constraints").value("Optional")),
             fieldWithPath("[].config.branding.footerLinks").description(BRANDING_FOOTER_LINKS_DESC).attributes(key("constraints").value("Optional")),
 
+            fieldWithPath("[].config.corsPolicy.xhrConfiguration.allowedOrigins").description(CORS_XHR_ORIGINS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("[].config.corsPolicy.xhrConfiguration.allowedOriginPatterns").description(CORS_XHR_ORIGIN_PATTERNS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("[].config.corsPolicy.xhrConfiguration.allowedUris").description(CORS_XHR_URI_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("[].config.corsPolicy.xhrConfiguration.allowedUriPatterns").description(CORS_XHR_URI_PATTERNS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("[].config.corsPolicy.xhrConfiguration.allowedHeaders").description(CORS_XHR_HEADERS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("[].config.corsPolicy.xhrConfiguration.allowedMethods").description(CORS_XHR_METHODS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("[].config.corsPolicy.xhrConfiguration.allowedCredentials").description(CORS_XHR_CREDENTIALS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("[].config.corsPolicy.xhrConfiguration.maxAge").description(CORS_XHR_MAXAGE_DESC).attributes(key("constraints").value("Optional")),
+
+            fieldWithPath("[].config.corsPolicy.defaultConfiguration.allowedOrigins").description(CORS_XHR_ORIGINS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("[].config.corsPolicy.defaultConfiguration.allowedOriginPatterns").description(CORS_XHR_ORIGIN_PATTERNS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("[].config.corsPolicy.defaultConfiguration.allowedUris").description(CORS_XHR_URI_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("[].config.corsPolicy.defaultConfiguration.allowedUriPatterns").description(CORS_XHR_URI_PATTERNS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("[].config.corsPolicy.defaultConfiguration.allowedHeaders").description(CORS_XHR_HEADERS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("[].config.corsPolicy.defaultConfiguration.allowedMethods").description(CORS_XHR_METHODS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("[].config.corsPolicy.defaultConfiguration.allowedCredentials").description(CORS_XHR_CREDENTIALS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("[].config.corsPolicy.defaultConfiguration.maxAge").description(CORS_XHR_MAXAGE_DESC).attributes(key("constraints").value("Optional")),
+
             fieldWithPath("[].created").ignored(),
             fieldWithPath("[].last_modified").ignored()
         );
@@ -326,6 +372,24 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
             fieldWithPath("config.branding.squareLogo").description(BRANDING_SQUARE_LOGO_DESC).attributes(key("constraints").value("Optional")),
             fieldWithPath("config.branding.footerLegalText").description(BRANDING_FOOTER_LEGAL_TEXT_DESC).attributes(key("constraints").value("Optional")),
             fieldWithPath("config.branding.footerLinks").description(BRANDING_FOOTER_LINKS_DESC).attributes(key("constraints").value("Optional")),
+
+            fieldWithPath("config.corsPolicy.xhrConfiguration.allowedOrigins").description(CORS_XHR_ORIGINS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.xhrConfiguration.allowedOriginPatterns").description(CORS_XHR_ORIGIN_PATTERNS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.xhrConfiguration.allowedUris").description(CORS_XHR_URI_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.xhrConfiguration.allowedUriPatterns").description(CORS_XHR_URI_PATTERNS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.xhrConfiguration.allowedHeaders").description(CORS_XHR_HEADERS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.xhrConfiguration.allowedMethods").description(CORS_XHR_METHODS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.xhrConfiguration.allowedCredentials").description(CORS_XHR_CREDENTIALS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.xhrConfiguration.maxAge").description(CORS_XHR_MAXAGE_DESC).attributes(key("constraints").value("Optional")),
+
+            fieldWithPath("config.corsPolicy.defaultConfiguration.allowedOrigins").description(CORS_XHR_ORIGINS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.defaultConfiguration.allowedOriginPatterns").description(CORS_XHR_ORIGIN_PATTERNS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.defaultConfiguration.allowedUris").description(CORS_XHR_URI_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.defaultConfiguration.allowedUriPatterns").description(CORS_XHR_URI_PATTERNS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.defaultConfiguration.allowedHeaders").description(CORS_XHR_HEADERS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.defaultConfiguration.allowedMethods").description(CORS_XHR_METHODS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.defaultConfiguration.allowedCredentials").description(CORS_XHR_CREDENTIALS_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.corsPolicy.defaultConfiguration.maxAge").description(CORS_XHR_MAXAGE_DESC).attributes(key("constraints").value("Optional")),
 
             fieldWithPath("created").ignored(),
             fieldWithPath("last_modified").ignored()
@@ -444,6 +508,24 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
             fieldWithPath("config.branding.squareLogo").description(BRANDING_SQUARE_LOGO_DESC),
             fieldWithPath("config.branding.footerLegalText").description(BRANDING_FOOTER_LEGAL_TEXT_DESC),
             fieldWithPath("config.branding.footerLinks").description(BRANDING_FOOTER_LINKS_DESC),
+
+            fieldWithPath("config.corsPolicy.defaultConfiguration.allowedOrigins").description(CORS_XHR_ORIGINS_DESC),
+            fieldWithPath("config.corsPolicy.defaultConfiguration.allowedOriginPatterns").description(CORS_XHR_ORIGIN_PATTERNS_DESC),
+            fieldWithPath("config.corsPolicy.defaultConfiguration.allowedUris").description(CORS_XHR_URI_DESC),
+            fieldWithPath("config.corsPolicy.defaultConfiguration.allowedUriPatterns").description(CORS_XHR_URI_PATTERNS_DESC),
+            fieldWithPath("config.corsPolicy.defaultConfiguration.allowedHeaders").description(CORS_XHR_HEADERS_DESC),
+            fieldWithPath("config.corsPolicy.defaultConfiguration.allowedMethods").description(CORS_XHR_METHODS_DESC),
+            fieldWithPath("config.corsPolicy.defaultConfiguration.allowedCredentials").description(CORS_XHR_CREDENTIALS_DESC),
+            fieldWithPath("config.corsPolicy.defaultConfiguration.maxAge").description(CORS_XHR_MAXAGE_DESC),
+
+            fieldWithPath("config.corsPolicy.xhrConfiguration.allowedOrigins").description(CORS_XHR_ORIGINS_DESC),
+            fieldWithPath("config.corsPolicy.xhrConfiguration.allowedOriginPatterns").description(CORS_XHR_ORIGIN_PATTERNS_DESC),
+            fieldWithPath("config.corsPolicy.xhrConfiguration.allowedUris").description(CORS_XHR_URI_DESC),
+            fieldWithPath("config.corsPolicy.xhrConfiguration.allowedUriPatterns").description(CORS_XHR_URI_PATTERNS_DESC),
+            fieldWithPath("config.corsPolicy.xhrConfiguration.allowedHeaders").description(CORS_XHR_HEADERS_DESC),
+            fieldWithPath("config.corsPolicy.xhrConfiguration.allowedMethods").description(CORS_XHR_METHODS_DESC),
+            fieldWithPath("config.corsPolicy.xhrConfiguration.allowedCredentials").description(CORS_XHR_CREDENTIALS_DESC),
+            fieldWithPath("config.corsPolicy.xhrConfiguration.maxAge").description(CORS_XHR_MAXAGE_DESC),
 
             fieldWithPath("created").ignored(),
             fieldWithPath("last_modified").ignored()

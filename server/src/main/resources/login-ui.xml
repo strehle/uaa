@@ -123,6 +123,24 @@
         <csrf disabled="true"/>
     </http>
 
+    <bean id="resetPasswordEntryPoint" class="org.cloudfoundry.identity.uaa.account.ResetPasswordAuthenticationEntryPoint"/>
+    <bean id="resetPasswordAuthenticationFilter" class="org.cloudfoundry.identity.uaa.account.ResetPasswordAuthenticationFilter">
+        <constructor-arg name="entryPoint" ref="resetPasswordEntryPoint"/>
+        <constructor-arg name="handler" ref="accountSavingAuthenticationSuccessHandler"/>
+        <constructor-arg name="service" ref="resetPasswordService"/>
+    </bean>
+    <http name="resetPasswordSubmit"
+          pattern="/reset_password.do"
+          disable-url-rewriting="true"
+          entry-point-ref="loginEntryPoint"
+          use-expressions="false"
+          xmlns="http://www.springframework.org/schema/security">
+        <custom-filter ref="userManagementSecurityFilter" before="ANONYMOUS_FILTER"/>
+        <custom-filter ref="resetPasswordAuthenticationFilter" position="LAST"/>
+        <csrf disabled="false"/>
+        <access-denied-handler ref="loginEntryPoint"/>
+    </http>
+
     <http name="resetPasswordSecurity"
           pattern="/reset_password**"
           disable-url-rewriting="true"
@@ -207,18 +225,28 @@
         </constructor-arg>
     </bean>
 
-
+    <bean id="samlLogoutHandlers" class="java.util.ArrayList">
+        <constructor-arg>
+            <util:list>
+                <ref bean="currentUserCookieDestructor" />
+                <ref bean="samlLogoutHandler" />
+            </util:list>
+        </constructor-arg>
+    </bean>
 
     <bean id="loginCookieCsrfRepository" class="org.cloudfoundry.identity.uaa.security.web.CookieBasedCsrfTokenRepository">
         <property name="secure" value="${require_https:false}" />
     </bean>
 
-    <bean id="accountSavingAuthenticationSuccessHandler" class="org.cloudfoundry.identity.uaa.login.AccountSavingAuthenticationSuccessHandler" />
+    <bean id="accountSavingAuthenticationSuccessHandler" class="org.cloudfoundry.identity.uaa.login.AccountSavingAuthenticationSuccessHandler">
+        <property name="redirectingHandler" ref="successRedirectHandler"/>
+    </bean>
 
     <bean id="logoutFilter" class="org.springframework.security.web.authentication.logout.LogoutFilter">
         <constructor-arg index="0" ref="logoutHandler"/>
         <constructor-arg index="1">
             <util:list>
+                <ref bean="currentUserCookieDestructor" />
                 <bean class="org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler"/>
                 <bean class="org.springframework.security.web.csrf.CsrfLogoutHandler">
                     <constructor-arg ref="loginCookieCsrfRepository"/>
@@ -245,7 +273,7 @@
                   password-parameter="password"
                   login-processing-url="/login.do"
                   authentication-success-handler-ref="accountSavingAuthenticationSuccessHandler"
-                  authentication-failure-handler-ref="loginAuthenticationFailureHandler"
+                  authentication-failure-handler-ref="currentUserCookieDestructor"
                   authentication-details-source-ref="authenticationDetailsSource"
                   default-target-url="/"/>
       <!--<logout logout-url="/logout.do" success-handler-ref="logoutHandler" invalidate-session="true"/>-->
@@ -264,7 +292,7 @@
 
     <bean id="savedRequestAwareAuthenticationDetailsSource" class="org.cloudfoundry.identity.uaa.security.SavedRequestAwareAuthenticationDetailsSource"/>
 
-    <bean id="loginAuthenticationFailureHandler" class="org.springframework.security.web.authentication.ExceptionMappingAuthenticationFailureHandler">
+    <bean id="errorMessageAuthenticationFailureHandler" class="org.springframework.security.web.authentication.ExceptionMappingAuthenticationFailureHandler">
         <property name="exceptionMappings">
             <map>
                 <entry key="org.cloudfoundry.identity.uaa.authentication.AccountNotVerifiedException" value="/login?error=account_not_verified" />
@@ -274,6 +302,10 @@
             </map>
         </property>
         <property name="defaultFailureUrl" value="/login?error=login_failure" />
+    </bean>
+
+    <bean id="currentUserCookieDestructor" class="org.cloudfoundry.identity.uaa.login.CurrentUserCookieDestructor">
+      <constructor-arg name="delegate" ref="errorMessageAuthenticationFailureHandler" />
     </bean>
 
     <security:http name="verifyEmailSecurity" pattern="/verify_email" disable-url-rewriting="true"
@@ -359,6 +391,8 @@
     <property name="links" ref="links" />
   </bean>
 
+  <bean id="sessionController" class="org.cloudfoundry.identity.uaa.login.SessionController"/>
+
   <!--apply the oauth client context -->
   <oauth:client id="oauth2ClientFilter" />
 
@@ -424,6 +458,7 @@
                 <value>POST</value>
             </set>
         </property>
+        <property name="successHandler" ref="accountSavingAuthenticationSuccessHandler"/>
     </bean>
 
     <!-- Pattern: /oauth/authorize parameters:{response_type=code,code=?} -->
@@ -447,7 +482,7 @@
     </bean>
 
     <!-- Handler deciding where to redirect user after successful login -->
-    <bean id="successRedirectHandler" class="org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler" />
+    <bean id="successRedirectHandler" class="org.cloudfoundry.identity.uaa.web.UaaSavedRequestAwareAuthenticationSuccessHandler" />
 
     <bean id="openIdUserDetailsService" class="org.cloudfoundry.identity.uaa.account.OpenIdUserDetailsService" />
 
@@ -473,7 +508,6 @@
     </bean>
 
     <mvc:resources mapping="/resources/**" location="/resources/" />
-    <mvc:annotation-driven />
     <mvc:default-servlet-handler />
 
     <bean id="springResourceResourceResolver"
@@ -607,6 +641,7 @@
         <constructor-arg ref="mailTemplateEngine"/>
         <constructor-arg ref="codeStore"/>
         <constructor-arg ref="userDatabase"/>
+        <constructor-arg ref="accountSavingAuthenticationSuccessHandler"/>
     </bean>
 
     <bean id="changeEmailController" class="org.cloudfoundry.identity.uaa.account.ChangeEmailController">

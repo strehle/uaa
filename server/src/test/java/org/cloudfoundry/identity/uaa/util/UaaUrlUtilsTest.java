@@ -215,6 +215,32 @@ public class UaaUrlUtilsTest {
         assertThat(matchingRedirectUri5, equalTo(fallback));
     }
 
+    @Test
+    public void test_add_query_parameter() {
+        String url = "http://sub.domain.com";
+        String name = "name";
+        String value = "value";
+        assertEquals("http://sub.domain.com?name=value", UaaUrlUtils.addQueryParameter(url, name, value));
+        assertEquals("http://sub.domain.com/?name=value", UaaUrlUtils.addQueryParameter(url+"/", name, value));
+        assertEquals("http://sub.domain.com?key=value&name=value", UaaUrlUtils.addQueryParameter(url+"?key=value", name, value));
+        assertEquals("http://sub.domain.com?key=value&name=value#frag=fragvalue", UaaUrlUtils.addQueryParameter(url+"?key=value#frag=fragvalue", name, value));
+        assertEquals("http://sub.domain.com?name=value#frag=fragvalue", UaaUrlUtils.addQueryParameter(url+"#frag=fragvalue", name, value));
+    }
+
+    @Test
+    public void test_add_fragment_component() {
+        String url = "http://sub.domain.com";
+        String component = "name=value";
+        assertEquals("http://sub.domain.com#name=value", UaaUrlUtils.addFragmentComponent(url, component));
+    }
+
+    @Test
+    public void test_add_fragment_component_to_prior_fragment() {
+        String url = "http://sub.domain.com#frag";
+        String component = "name=value";
+        assertEquals("http://sub.domain.com#frag&name=value", UaaUrlUtils.addFragmentComponent(url, component));
+    }
+
     private void setIdentityZone(String subdomain) {
         IdentityZone zone = MultitenancyFixture.identityZone(subdomain, subdomain);
         IdentityZoneHolder.set(zone);
