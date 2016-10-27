@@ -10,21 +10,19 @@
  *     subcomponents is subject to the terms and conditions of the
  *     subcomponent's license, as noted in the LICENSE file.
  *******************************************************************************/
-package org.cloudfoundry.identity.uaa.login;
+package org.cloudfoundry.identity.uaa.authentication.manager;
 
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.cloudfoundry.identity.uaa.provider.LockoutPolicy;
 
-@Controller
-public class SessionController {
 
-    @RequestMapping("/session")
-    public String session(Model model, @RequestParam String clientId, @RequestParam String messageOrigin) {
-        model.addAttribute("clientId", clientId);
-        model.addAttribute("messageOrigin", messageOrigin);
-        return "session";
-    }
-
+/**
+ * This is an interface thats abstracts logic for retrieving both User and Client lockout policies
+ *
+ */
+public interface LockoutPolicyRetriever {
+    LockoutPolicy getLockoutPolicy();
+    
+    LockoutPolicy getDefaultLockoutPolicy();
+    
+    void setDefaultLockoutPolicy(LockoutPolicy defaultLockoutPolicy);
 }
