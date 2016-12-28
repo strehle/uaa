@@ -30,7 +30,13 @@ If this works you are in business:
 
     $ git clone git://github.com/cloudfoundry/uaa.git
     $ cd uaa
-    $ ./gradlew run
+    $ ./gradlew  run
+    
+    
+NOTE: Recent changes removed default keys and default users from the UAA.
+We currently enable default keys using the LOGIN_CONFIG_URL variable and load
+default sample data is loaded using the `default` spring profile (`spring.profiles.active`).
+In the gradle script we set `LOGIN_CONFIG_URL=file://$PWD/uaa/src/main/resources/required_configuration.yml`
 
 The apps all work together with the apps running on the same port
 (8080) as [`/uaa`](http://localhost:8080/uaa), [`/app`](http://localhost:8080/app) and [`/api`](http://localhost:8080/api).
@@ -44,6 +50,10 @@ which you should find under something like:-
     /private/var/folders/7v/518b18d97_3f4c8fzxphy6f8zcm51c/T/cargo/conf/logs/
 
 ### Deploy to Cloud Foundry
+
+Currently you are also required to set the following values that are not included with the defaults:
+https://github.com/cloudfoundry/uaa/blob/master/uaa/src/main/resources/required_configuration.yml
+
 
 You can also build the app and push it to Cloud Foundry, e.g.
 Our recommended way is to use a manifest file, but you can do everything on the command line.

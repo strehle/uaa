@@ -38,6 +38,7 @@ import org.cloudfoundry.identity.uaa.user.InMemoryUaaUserDatabase;
 import org.cloudfoundry.identity.uaa.user.UaaAuthority;
 import org.cloudfoundry.identity.uaa.user.UaaUser;
 import org.cloudfoundry.identity.uaa.user.UaaUserPrototype;
+import org.cloudfoundry.identity.uaa.user.UserInfo;
 import org.cloudfoundry.identity.uaa.util.JsonUtils;
 import org.cloudfoundry.identity.uaa.util.UaaTokenUtils;
 import org.cloudfoundry.identity.uaa.zone.MultitenancyFixture;
@@ -56,6 +57,8 @@ import org.springframework.security.jwt.crypto.sign.InvalidSignatureException;
 import org.springframework.security.jwt.crypto.sign.RsaSigner;
 import org.springframework.security.oauth2.common.exceptions.InvalidTokenException;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.context.request.RequestAttributes;
@@ -198,6 +201,13 @@ public class XOAuthAuthenticationManagerTest {
                     "MFswDQYJKoZIhvcNAQEBBQADSgAwRwJAcjAgsHEfrUxeTFwQPb17AkZ2Im4SfZdp\n" +
                     "Y8Ada9pZfxXz1PZSqv9TPTMAzNx+EkzMk2IMYN+uNm1bfDzaxVdz+QIDAQAB\n" +
                     "-----END PUBLIC KEY-----");
+        config.setExternalGroupsWhitelist(
+            Arrays.asList(
+                "*",
+                "*.*",
+                "*.*.*"
+            )
+        );
 
         mockUaaServer = MockRestServiceServer.createServer(xoAuthAuthenticationManager.getRestTemplate(config));
         reset(xoAuthAuthenticationManager);
@@ -664,6 +674,30 @@ public class XOAuthAuthenticationManagerTest {
         mockToken();
         UaaAuthentication authentication = (UaaAuthentication)xoAuthAuthenticationManager.authenticate(xCodeToken);
         assertThat(authentication.getAuthenticationMethods(), containsInAnyOrder("mfa", "rba", "ext"));
+    }
+
+    @Test
+    public void test_custom_user_attributes_are_stored() throws Exception {
+        addTheUserOnAuth();
+
+        List<String> managers = Arrays.asList("Sue the Sloth", "Kari the AntEater");
+        List<String> costCenter = Arrays.asList("Austin, TX");
+        claims.put("managers", managers);
+        claims.put("employeeCostCenter", costCenter);
+        attributeMappings.put("user.attribute.costCenter", "employeeCostCenter");
+        attributeMappings.put("user.attribute.terribleBosses", "managers");
+        config.setStoreCustomAttributes(true);
+        mockToken();
+        MultiValueMap<String, String> map = new LinkedMultiValueMap<>();
+        map.put("costCenter", costCenter);
+        map.put("terribleBosses", managers);
+        UserInfo info = new UserInfo(map);
+        UaaAuthentication authentication = (UaaAuthentication)xoAuthAuthenticationManager.authenticate(xCodeToken);
+        assertEquals(map, authentication.getUserAttributes());
+        info.setUserId(authentication.getPrincipal().getId());
+        assertEquals(map, authentication.getUserAttributes());
+        assertEquals(info, xoAuthAuthenticationManager.getUserDatabase().getUserInfo(info.getUserId()));
+
     }
 
     private void mockToken() throws MalformedURLException {

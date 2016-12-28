@@ -52,7 +52,7 @@ public class JdbcUaaUserDatabaseTests extends JdbcTestBase {
 
     private static final String JOE_ID = "550e8400-e29b-41d4-a716-446655440000";
 
-    private static final String addUserSql = "insert into users (id, username, password, email, givenName, familyName, phoneNumber, origin, identity_zone_id, created, lastmodified, passwd_lastmodified) values (?,?,?,?,?,?,?,?,?,?,?,?)";
+    private static final String addUserSql = "insert into users (id, username, password, email, givenName, familyName, phoneNumber, origin, identity_zone_id, created, lastmodified, passwd_lastmodified, passwd_change_required) values (?,?,?,?,?,?,?,?,?,?,?,?,?)";
 
     private static final String getAuthoritiesSql = "select authorities from users where id=?";
 
@@ -66,15 +66,14 @@ public class JdbcUaaUserDatabaseTests extends JdbcTestBase {
 
     private IdentityZone otherIdentityZone;
 
-
     private JdbcTemplate template;
     public static final String ADD_GROUP_SQL = "insert into groups (id, displayName, identity_zone_id) values (?,?,?)";
     public static final String ADD_MEMBER_SQL = "insert into group_membership (group_id, member_id, member_type, authorities) values (?,?,?,?)";
 
-    private void addUser(String id, String name, String password) {
+    private void addUser(String id, String name, String password, boolean requiresPasswordChange) {
         TestUtils.assertNoSuchUser(template, "id", id);
         Timestamp t = new Timestamp(System.currentTimeMillis());
-        template.update(addUserSql, id, name, password, name.toLowerCase() + "@test.org", name, name, "", OriginKeys.UAA, IdentityZoneHolder.get().getId(),t,t,t);
+        template.update(addUserSql, id, name, password, name.toLowerCase() + "@test.org", name, name, "", OriginKeys.UAA, IdentityZoneHolder.get().getId(),t,t,t,requiresPasswordChange);
     }
 
     private void addAuthority(String authority, String userId) {
@@ -99,10 +98,10 @@ public class JdbcUaaUserDatabaseTests extends JdbcTestBase {
         TestUtils.assertNoSuchUser(template, "id", ALICE_ID);
         TestUtils.assertNoSuchUser(template, "userName", "jo@foo.com");
 
-        addUser(JOE_ID, "Joe", "joespassword");
-        addUser(MABEL_ID, "mabel", "mabelspassword");
+        addUser(JOE_ID, "Joe", "joespassword", true);
+        addUser(MABEL_ID, "mabel", "mabelspassword", false);
         IdentityZoneHolder.set(otherIdentityZone);
-        addUser(ALICE_ID, "alice", "alicespassword");
+        addUser(ALICE_ID, "alice", "alicespassword", false);
         IdentityZoneHolder.clear();
     }
 
@@ -110,6 +109,52 @@ public class JdbcUaaUserDatabaseTests extends JdbcTestBase {
     public void clearDb() throws Exception {
         IdentityZoneHolder.clear();
         TestUtils.deleteFrom(dataSource, "users");
+    }
+
+
+    @Test(expected = NullPointerException.class)
+    public void testStoreUserInfoWithoutId() {
+        db.storeUserInfo(null, new UserInfo());
+    }
+
+    @Test
+    public void testStoreNullUserInfo() {
+        String id = "id";
+        db.storeUserInfo(id, null);
+        UserInfo info2 = db.getUserInfo(id);
+        assertEquals(id, info2.getUserId());
+        assertEquals(1, info2.size());
+    }
+
+    @Test
+    public void testStoreUserInfoOverridesID() {
+        UserInfo info = new UserInfo();
+        String id = "id", id1 = id + "1";
+        info.setUserId(id);
+        info.put("family_name","Somelastname");
+        info.put("given_name","Somefirstname");
+        db.storeUserInfo(id1, info);
+        UserInfo info2 = db.getUserInfo(id1);
+        info.setUserId(id1);
+        assertEquals(info, info2);
+    }
+
+
+    @Test
+    public void testStoreUserInfo() {
+        UserInfo info = new UserInfo();
+        String id = "id";
+        info.setUserId(id);
+        info.put("family_name","Somelastname");
+        info.put("given_name","Somefirstname");
+        db.storeUserInfo(id, info);
+        UserInfo info2 = db.getUserInfo(id);
+        assertEquals(info, info2);
+
+        info.put("new","value");
+        db.storeUserInfo(id, info);
+        UserInfo info3  = db.getUserInfo(id);
+        assertEquals(info, info3);
     }
 
     @Test
@@ -203,6 +248,7 @@ public class JdbcUaaUserDatabaseTests extends JdbcTestBase {
         assertEquals("Joe", joe.getUsername());
         assertEquals("joe@test.org", joe.getEmail());
         assertEquals("joespassword", joe.getPassword());
+        assertEquals(true, joe.isPasswordChangeRequired());
         assertTrue("authorities does not contain uaa.user",
                         joe.getAuthorities().contains(new SimpleGrantedAuthority("uaa.user")));
     }
