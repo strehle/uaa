@@ -38,7 +38,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.provider.ClientDetails;
 import org.springframework.security.oauth2.provider.ClientDetailsService;
 import org.springframework.security.oauth2.provider.NoSuchClientException;
-import org.springframework.web.client.RestClientException;
 
 import java.sql.Timestamp;
 import java.util.Collections;
@@ -69,13 +68,14 @@ public class UaaResetPasswordService implements ResetPasswordService, Applicatio
     }
 
     @Override
-    public ResetPasswordResponse resetPassword(String code, String newPassword) throws InvalidPasswordException {
-        try {
-            passwordValidator.validate(newPassword);
-            return changePasswordCodeAuthenticated(code, newPassword);
-        } catch (RestClientException e) {
-            throw new UaaException(e.getMessage());
-        }
+    public ResetPasswordResponse resetPassword(ExpiringCode code, String newPassword) {
+        passwordValidator.validate(newPassword);
+        return changePasswordCodeAuthenticated(code, newPassword);
+    }
+
+    @Override
+    public void updateLastLogonTime(String userId) {
+        scimUserProvisioning.updateLastLogonTime(userId);
     }
 
     @Override
@@ -89,11 +89,7 @@ public class UaaResetPasswordService implements ResetPasswordService, Applicatio
         updatePasswordAndPublishEvent(scimUserProvisioning, uaaUser, authentication, password);
     }
 
-    private ResetPasswordResponse changePasswordCodeAuthenticated(String code, String newPassword) {
-        ExpiringCode expiringCode = expiringCodeStore.checkCode(code);
-        if (expiringCode == null) {
-            throw new InvalidCodeException("invalid_code", "Sorry, your reset password link is no longer valid. Please request a new one", 422);
-        }
+    private ResetPasswordResponse changePasswordCodeAuthenticated(ExpiringCode expiringCode, String newPassword) {
         String userId;
         String userName;
         Date passwordLastModified;
@@ -118,7 +114,6 @@ public class UaaResetPasswordService implements ResetPasswordService, Applicatio
             if (scimUserProvisioning.checkPasswordMatches(userId, newPassword)) {
                 throw new InvalidPasswordException("Your new password cannot be the same as the old password.", UNPROCESSABLE_ENTITY);
             }
-            expiringCodeStore.retrieveCode(code);
             if (isUserModified(user, expiringCode.getExpiresAt(), userName, passwordLastModified)) {
                 throw new UaaException("Invalid password reset request.");
             }
@@ -134,7 +129,7 @@ public class UaaResetPasswordService implements ResetPasswordService, Applicatio
                     ClientDetails clientDetails = clientDetailsService.loadClientByClientId(clientId);
                     Set<String> redirectUris = clientDetails.getRegisteredRedirectUri() == null ? Collections.emptySet() :
                         clientDetails.getRegisteredRedirectUri();
-                    String matchingRedirectUri = UaaUrlUtils.findMatchingRedirectUri(redirectUris, redirectUri, null);
+                    String matchingRedirectUri = UaaUrlUtils.findMatchingRedirectUri(redirectUris, redirectUri, redirectLocation);
                     if (matchingRedirectUri != null) {
                         redirectLocation = matchingRedirectUri;
                     }

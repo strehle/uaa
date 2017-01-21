@@ -15,6 +15,7 @@ package org.cloudfoundry.identity.uaa.user;
 import org.cloudfoundry.identity.uaa.constants.OriginKeys;
 import org.cloudfoundry.identity.uaa.test.JdbcTestBase;
 import org.cloudfoundry.identity.uaa.test.TestUtils;
+import org.cloudfoundry.identity.uaa.util.TimeService;
 import org.cloudfoundry.identity.uaa.zone.IdentityZone;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
 import org.junit.After;
@@ -24,10 +25,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.oauth2.common.util.RandomValueStringGenerator;
+import org.springframework.util.LinkedMultiValueMap;
 
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.UUID;
 
 import static org.cloudfoundry.identity.uaa.user.JdbcUaaUserDatabase.DEFAULT_CASE_INSENSITIVE_USER_BY_EMAIL_AND_ORIGIN_QUERY;
@@ -45,6 +49,7 @@ import static org.junit.Assert.fail;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 public class JdbcUaaUserDatabaseTests extends JdbcTestBase {
 
@@ -69,6 +74,7 @@ public class JdbcUaaUserDatabaseTests extends JdbcTestBase {
     private JdbcTemplate template;
     public static final String ADD_GROUP_SQL = "insert into groups (id, displayName, identity_zone_id) values (?,?,?)";
     public static final String ADD_MEMBER_SQL = "insert into group_membership (group_id, member_id, member_type, authorities) values (?,?,?,?)";
+    private TimeService timeService;
 
     private void addUser(String id, String name, String password, boolean requiresPasswordChange) {
         TestUtils.assertNoSuchUser(template, "id", id);
@@ -84,13 +90,14 @@ public class JdbcUaaUserDatabaseTests extends JdbcTestBase {
 
     @Before
     public void initializeDb() throws Exception {
+        timeService = mock(TimeService.class);
         IdentityZoneHolder.clear();
         otherIdentityZone = new IdentityZone();
         otherIdentityZone.setId("some-other-zone-id");
 
         template = new JdbcTemplate(dataSource);
 
-        db = new JdbcUaaUserDatabase(template);
+        db = new JdbcUaaUserDatabase(template, timeService);
         db.setDefaultAuthorities(Collections.singleton("uaa.user"));
 
         TestUtils.assertNoSuchUser(template, "id", JOE_ID);
@@ -122,21 +129,8 @@ public class JdbcUaaUserDatabaseTests extends JdbcTestBase {
         String id = "id";
         db.storeUserInfo(id, null);
         UserInfo info2 = db.getUserInfo(id);
-        assertEquals(id, info2.getUserId());
-        assertEquals(1, info2.size());
-    }
-
-    @Test
-    public void testStoreUserInfoOverridesID() {
-        UserInfo info = new UserInfo();
-        String id = "id", id1 = id + "1";
-        info.setUserId(id);
-        info.put("family_name","Somelastname");
-        info.put("given_name","Somefirstname");
-        db.storeUserInfo(id1, info);
-        UserInfo info2 = db.getUserInfo(id1);
-        info.setUserId(id1);
-        assertEquals(info, info2);
+        assertNull(info2.getRoles());
+        assertNull(info2.getUserAttributes());
     }
 
 
@@ -144,17 +138,28 @@ public class JdbcUaaUserDatabaseTests extends JdbcTestBase {
     public void testStoreUserInfo() {
         UserInfo info = new UserInfo();
         String id = "id";
-        info.setUserId(id);
-        info.put("family_name","Somelastname");
-        info.put("given_name","Somefirstname");
+        LinkedMultiValueMap<String, String> userAttributes = new LinkedMultiValueMap<>();
+        userAttributes.add("single", "1");
+        userAttributes.add("multi", "2");
+        userAttributes.add("multi", "3");
+        info.setUserAttributes(userAttributes);
+        List<String> roles = new LinkedList(Arrays.asList("role1", "role2", "role3"));
+        info.setRoles(roles);
+
+
         db.storeUserInfo(id, info);
         UserInfo info2 = db.getUserInfo(id);
         assertEquals(info, info2);
+        assertEquals(userAttributes, info2.getUserAttributes());
+        assertEquals(roles, info2.getRoles());
 
-        info.put("new","value");
+        roles.add("role4");
+        userAttributes.add("multi", "4");
         db.storeUserInfo(id, info);
         UserInfo info3  = db.getUserInfo(id);
         assertEquals(info, info3);
+        assertEquals(userAttributes, info3.getUserAttributes());
+        assertEquals(roles, info3.getRoles());
     }
 
     @Test
@@ -307,6 +312,20 @@ public class JdbcUaaUserDatabaseTests extends JdbcTestBase {
         );
     }
 
+    @Test
+    public void testUpdatePreviousAndLastLogonTime() {
+        when(timeService.getCurrentTimeMillis()).thenReturn(1000L);
+        db.updateLastLogonTime(JOE_ID);
+        UaaUser joe = db.retrieveUserById(JOE_ID);
+        assertEquals((long) joe.getLastLogonTime(), 1000L);
+        assertNull(joe.getPreviousLogonTime());
+
+        when(timeService.getCurrentTimeMillis()).thenReturn(2000L);
+        db.updateLastLogonTime(JOE_ID);
+        joe = db.retrieveUserById(JOE_ID);
+        assertEquals((long) joe.getPreviousLogonTime(), 1000L);
+        assertEquals((long) joe.getLastLogonTime(), 2000L);
+    }
 
     @Test(expected = UsernameNotFoundException.class)
     public void getValidUserInDefaultZoneFromOtherZoneFails() {

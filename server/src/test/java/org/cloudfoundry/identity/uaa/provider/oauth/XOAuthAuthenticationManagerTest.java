@@ -203,9 +203,7 @@ public class XOAuthAuthenticationManagerTest {
                     "-----END PUBLIC KEY-----");
         config.setExternalGroupsWhitelist(
             Arrays.asList(
-                "*",
-                "*.*",
-                "*.*.*"
+                "*"
             )
         );
 
@@ -687,16 +685,23 @@ public class XOAuthAuthenticationManagerTest {
         attributeMappings.put("user.attribute.costCenter", "employeeCostCenter");
         attributeMappings.put("user.attribute.terribleBosses", "managers");
         config.setStoreCustomAttributes(true);
+        config.setExternalGroupsWhitelist(Arrays.asList("*"));
+        List<String> scopes = Arrays.asList("openid", "some.other.scope", "closedid");
+        claims.put("scope", scopes);
+        attributeMappings.put(GROUP_ATTRIBUTE_NAME, "scope");
         mockToken();
         MultiValueMap<String, String> map = new LinkedMultiValueMap<>();
         map.put("costCenter", costCenter);
         map.put("terribleBosses", managers);
-        UserInfo info = new UserInfo(map);
         UaaAuthentication authentication = (UaaAuthentication)xoAuthAuthenticationManager.authenticate(xCodeToken);
         assertEquals(map, authentication.getUserAttributes());
-        info.setUserId(authentication.getPrincipal().getId());
-        assertEquals(map, authentication.getUserAttributes());
-        assertEquals(info, xoAuthAuthenticationManager.getUserDatabase().getUserInfo(info.getUserId()));
+        assertThat(authentication.getExternalGroups(), containsInAnyOrder(scopes.toArray()));
+        UserInfo info = new UserInfo()
+            .setUserAttributes(map)
+            .setRoles(scopes);
+        UserInfo actualUserInfo = xoAuthAuthenticationManager.getUserDatabase().getUserInfo(authentication.getPrincipal().getId());
+        assertEquals(actualUserInfo.getUserAttributes(), info.getUserAttributes());
+        assertThat(actualUserInfo.getRoles(), containsInAnyOrder(info.getRoles().toArray()));
 
     }
 

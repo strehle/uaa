@@ -1,5 +1,5 @@
 /*******************************************************************************
- *     Cloud Foundry 
+ *     Cloud Foundry
  *     Copyright (c) [2009-2016] Pivotal Software, Inc. All Rights Reserved.
  *
  *     This product is licensed to you under the Apache License, Version 2.0 (the "License").
@@ -15,6 +15,7 @@ package org.cloudfoundry.identity.uaa.codestore;
 import org.cloudfoundry.identity.uaa.test.JdbcTestBase;
 import org.cloudfoundry.identity.uaa.test.TestUtils;
 import org.cloudfoundry.identity.uaa.util.TimeService;
+import org.cloudfoundry.identity.uaa.util.TimeServiceImpl;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -40,7 +41,7 @@ public class ExpiringCodeStoreTests extends JdbcTestBase {
 
     private ExpiringCodeStore expiringCodeStore;
     private Class expiringCodeStoreClass;
-    private TimeService timeService = mock(TimeService.class);
+    private TimeService timeService = mock(TimeServiceImpl.class);
 
     public ExpiringCodeStoreTests(Class expiringCodeStoreClass) {
         this.expiringCodeStoreClass = expiringCodeStoreClass;
@@ -141,46 +142,6 @@ public class ExpiringCodeStoreTests extends JdbcTestBase {
     @Test(expected = NullPointerException.class)
     public void testRetrieveCodeWithNullCode() throws Exception {
         expiringCodeStore.retrieveCode(null);
-    }
-
-    @Test
-    public void testCheckCode_doesNotDeleteCodeWhenFound() {
-        String data = "{\"secret\":\"mary had a little lamb\"}";
-        Timestamp expiresAt = new Timestamp(System.currentTimeMillis() + 60000);
-        ExpiringCode generatedCode = expiringCodeStore.generateCode(data, expiresAt, null);
-
-        ExpiringCode checked = expiringCodeStore.checkCode(generatedCode.getCode());
-        Assert.assertNotNull(checked);
-        Assert.assertNotNull(checked.getCode());
-        Assert.assertEquals(data, checked.getData());
-        Assert.assertEquals(checked.getCode(), generatedCode.getCode());
-
-        ExpiringCode retrieved = expiringCodeStore.retrieveCode(generatedCode.getCode());
-        Assert.assertEquals("{\"secret\":\"mary had a little lamb\"}", retrieved.getData());
-    }
-
-    @Test
-    public void testCheckCode_doesNotReturnExpiredEntries() {
-        long generationTime = 100000L;
-        when(timeService.getCurrentTimeMillis()).thenReturn(generationTime);
-        String data = "{\"secret\":\"mary had a little lamb\"}";
-        Timestamp expiresAt = new Timestamp(generationTime);
-        ExpiringCode generatedCode = expiringCodeStore.generateCode(data, expiresAt, null);
-
-        long expirationTime = 200000L;
-        when(timeService.getCurrentTimeMillis()).thenReturn(expirationTime);
-        ExpiringCode checked = expiringCodeStore.checkCode(generatedCode.getCode());
-        Assert.assertNull(checked);
-    }
-
-    @Test
-    public void testCheckCode_whenCodeDoesntExist_returnsNull() {
-        Assert.assertNull(expiringCodeStore.checkCode("expiredCodeNoLongerInDB"));
-    }
-
-    @Test(expected = NullPointerException.class)
-    public void testCheckCode_whenLookingUpNullCode_throwsNullPointerException() {
-        expiringCodeStore.checkCode(null);
     }
 
     @Test

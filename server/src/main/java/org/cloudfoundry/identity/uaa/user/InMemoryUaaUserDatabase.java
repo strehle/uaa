@@ -75,11 +75,17 @@ public class InMemoryUaaUserDatabase implements UaaUserDatabase {
     }
 
     @Override
-    public UserInfo storeUserInfo(String id, UserInfo info) {
-        info = new UserInfo(info);
-        info.setUserId(id);
-        userInfo.put(id, info);
-        return info;
+    public UserInfo storeUserInfo(String id, UserInfo i) {
+        UserInfo info = new UserInfo()
+            .setUserAttributes(i.getUserAttributes())
+            .setRoles(i.getRoles());
+        this.userInfo.put(id, info);
+        return i;
+    }
+
+    @Override
+    public void updateLastLogonTime(String id) {
+        retrieveUserById(id).setLastLogonTime(System.currentTimeMillis());
     }
 
     public UaaUser updateUser(String userId, UaaUser user) throws UsernameNotFoundException {

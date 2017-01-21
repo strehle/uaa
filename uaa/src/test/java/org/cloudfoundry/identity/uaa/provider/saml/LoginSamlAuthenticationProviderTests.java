@@ -36,6 +36,7 @@ import org.cloudfoundry.identity.uaa.user.JdbcUaaUserDatabase;
 import org.cloudfoundry.identity.uaa.user.UaaAuthority;
 import org.cloudfoundry.identity.uaa.user.UaaUser;
 import org.cloudfoundry.identity.uaa.user.UserInfo;
+import org.cloudfoundry.identity.uaa.util.TimeService;
 import org.cloudfoundry.identity.uaa.zone.IdentityZone;
 import org.joda.time.DateTime;
 import org.junit.Before;
@@ -131,6 +132,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
     private ScimGroup uaaSamlUser;
     private ScimGroup uaaSamlAdmin;
     private ScimGroup uaaSamlTest;
+    private TimeService timeService;
 
     public List<Attribute> getAttributes(Map<String,Object> values) {
         List<Attribute> result = new LinkedList<>();
@@ -228,7 +230,8 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
 
         when(consumer.processAuthenticationResponse(anyObject())).thenReturn(credential);
 
-        userDatabase = new JdbcUaaUserDatabase(jdbcTemplate);
+        timeService = mock(TimeService.class);
+        userDatabase = new JdbcUaaUserDatabase(jdbcTemplate, timeService);
         userDatabase.setDefaultAuthorities(new HashSet<>(Arrays.asList(UaaAuthority.UAA_USER.getAuthority())));
         providerProvisioning = new JdbcIdentityProviderProvisioning(jdbcTemplate);
         publisher = new CreateUserPublisher(bootstrap);
@@ -445,7 +448,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
     @Test
     public void add_external_groups_to_authentication_with_wildcard_whitelist() throws Exception {
         providerDefinition.addAttributeMapping(GROUP_ATTRIBUTE_NAME, "groups");
-        providerDefinition.addWhiteListedGroup("saml.*");
+        providerDefinition.addWhiteListedGroup("saml*");
         provider.setConfig(providerDefinition);
         providerProvisioning.update(provider);
         UaaAuthentication authentication = getAuthentication();
@@ -578,6 +581,8 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
         UserInfo userInfo = userDatabase.getUserInfo(user.getId());
         assertNull(userInfo);
 
+        providerDefinition.addAttributeMapping(GROUP_ATTRIBUTE_NAME, "groups");
+        providerDefinition.addWhiteListedGroup(SAML_ADMIN);
         providerDefinition.setStoreCustomAttributes(true);
         provider.setConfig(providerDefinition);
         provider = providerProvisioning.update(provider);
@@ -585,7 +590,10 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
         assertEquals("marissa.bloggs@test.com", authentication.getUserAttributes().getFirst("secondary_email"));
         userInfo = userDatabase.getUserInfo(user.getId());
         assertNotNull(userInfo);
-        assertEquals("marissa.bloggs@test.com", userInfo.getFirst("secondary_email"));
+        assertEquals("marissa.bloggs@test.com", userInfo.getUserAttributes().getFirst("secondary_email"));
+        assertNotNull(userInfo.getRoles());
+        assertEquals(1, userInfo.getRoles().size());
+        assertEquals(SAML_ADMIN, userInfo.getRoles().get(0));
     }
 
     @Test

@@ -40,7 +40,10 @@ import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.FAMILY_NA
 import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.GIVEN_NAME;
 import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.NAME;
 import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.PHONE_NUMBER;
+import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.PREVIOUS_LOGON_TIME;
+import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.ROLES;
 import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.SUB;
+import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.USER_ATTRIBUTES;
 import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.USER_ID;
 import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.USER_NAME;
 
@@ -134,9 +137,18 @@ public class UserInfoResponse {
     }
 
     public void addAttributes(MultiValueMap<String,Object> attr) {
-        ofNullable(attr).orElse(EMPTY_MAP).entrySet().stream().forEach(e -> setAttributeValues(e.getKey(), e.getValue()));
+        ofNullable(attr).orElse(EMPTY_MAP).entrySet().stream().forEach(
+            e -> setAttributeValues(e.getKey(), e.getValue())
+        );
     }
 
+    public Long getPreviousLogonSuccess() {
+        return (Long) getAttributeValue(PREVIOUS_LOGON_TIME);
+    }
+
+    public void setPreviousLogonSuccess(Long previousLogonSuccess) {
+        setAttributeValue(PREVIOUS_LOGON_TIME, previousLogonSuccess);
+    }
 
 
     public static class UserInfoResponseSerializer extends JsonSerializer<UserInfoResponse> {
@@ -157,17 +169,22 @@ public class UserInfoResponse {
                     case GIVEN_NAME:
                     case FAMILY_NAME:
                     case PHONE_NUMBER:
+                    case USER_ATTRIBUTES:
+                    case ROLES:
                     case EMAIL: {
                         gen.writeFieldName(key);
                         if (value == null || value.size() == 0) {
                             gen.writeNull();
                         } else {
                             //ensure that type error happens early
-                            String svalue = (String)value.get(0);
-                            gen.writeObject(svalue);
+                            gen.writeObject(value.get(0));
                         }
                         break;
                     }
+                    case PREVIOUS_LOGON_TIME:
+                        gen.writeFieldName(key);
+                        gen.writeObject(value.get(0));
+                        break;
                     //multi value fields
                     default:
                         gen.writeFieldName(key);
@@ -205,6 +222,12 @@ public class UserInfoResponse {
                         response.setAttributeValue(key, value);
                         break;
                     }
+                    case PREVIOUS_LOGON_TIME:
+                        if (value!=null) {
+                            Long longValue = value.getClass() == Long.class ? (Long) value : (Long) ((Integer) value).longValue();
+                            response.setAttributeValue(key, longValue);
+                        }
+                        break;
                     //multi value fields
                     default:
                         if (value instanceof List) {

@@ -46,11 +46,15 @@ import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.EMAIL;
 import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.FAMILY_NAME;
 import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.GIVEN_NAME;
 import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.PHONE_NUMBER;
+import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.ROLES;
 import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.USER_ATTRIBUTES;
+import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.USER_ID;
 import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.USER_NAME;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThat;
 
 public class UserInfoEndpointTests {
 
@@ -75,11 +79,13 @@ public class UserInfoEndpointTests {
                     .withVerified(false)
                     .withZoneId(IdentityZoneHolder.get().getId())
                     .withSalt("12345")
-                    .withPasswordLastModified(new Date()));
+                    .withPasswordLastModified(new Date())
+                    .withLastLogonSuccess(1000L)
+                    .withPreviousLogonSuccess(1000L));
     private InMemoryUaaUserDatabase userDatabase = new InMemoryUaaUserDatabase(Collections.singleton(user));
     private UserInfo info;
-    private UserInfo stored;
     private OAuth2Request request;
+    private List<String> roles;
 
     public UserInfoEndpointTests() {
         endpoint.setUserDatabase(userDatabase);
@@ -87,11 +93,14 @@ public class UserInfoEndpointTests {
 
     @Before
     public void setup() {
-        MultiValueMap<String, String> customattributes = new LinkedMultiValueMap<>();
-        customattributes.put(MULTI_VALUE, Arrays.asList("value1", "value2"));
-        customattributes.add(SINGLE_VALUE, "value3");
-        info = new UserInfo(customattributes);
-        stored = userDatabase.storeUserInfo(ID, info);
+        MultiValueMap<String, String> customAttributes = new LinkedMultiValueMap<>();
+        customAttributes.put(MULTI_VALUE, Arrays.asList("value1", "value2"));
+        customAttributes.add(SINGLE_VALUE, "value3");
+        roles = Arrays.asList("group1", "group1");
+        info = new UserInfo()
+            .setUserAttributes(customAttributes)
+            .setRoles(roles);
+        userDatabase.storeUserInfo(ID, info);
     }
 
     @Test
@@ -99,13 +108,28 @@ public class UserInfoEndpointTests {
         UaaUser user = userDatabase.retrieveUserByName("olds", OriginKeys.UAA);
         UaaAuthentication authentication = UaaAuthenticationTestFactory.getAuthentication(user.getId(), "olds",
                         "olds@vmware.com", new HashSet<>(Arrays.asList("openid")));
+
         UserInfoResponse map = endpoint.loginInfo(new OAuth2Authentication(createOauthRequest(Arrays.asList("openid")), authentication));
+
         assertEquals("olds", map.getUsername());
         assertEquals("Dale Olds", map.getFullName());
         assertEquals("olds@vmware.com", map.getEmail());
         assertEquals("8505551234", map.getPhoneNumber());
+        assertEquals(1000, (long) map.getPreviousLogonSuccess());
         assertEquals(user.getId(), map.getSub());
         assertNull(map.getAttributeValue(USER_ATTRIBUTES));
+    }
+
+    @Test
+    public void testSunnyDay_whenLastLogonNull_displaysNull() {
+        user.setPreviousLogonTime(null);
+        UaaUser user = userDatabase.retrieveUserByName("olds", OriginKeys.UAA);
+        UaaAuthentication authentication = UaaAuthenticationTestFactory.getAuthentication(user.getId(), "olds",
+            "olds@vmware.com", new HashSet<>(Arrays.asList("openid")));
+
+        UserInfoResponse map = endpoint.loginInfo(new OAuth2Authentication(createOauthRequest(Arrays.asList("openid")), authentication));
+
+        assertNull(map.getPreviousLogonSuccess());
     }
 
     @Test
@@ -116,7 +140,7 @@ public class UserInfoEndpointTests {
             "olds",
             "olds@vmware.com"
         );
-        request = createOauthRequest(Arrays.asList(USER_ATTRIBUTES, "openid"));
+        request = createOauthRequest(Arrays.asList(USER_ATTRIBUTES, "openid", ROLES));
         UserInfoResponse map = endpoint.loginInfo(new OAuth2Authentication(request, authentication));
         assertEquals("olds", map.getAttributeValue(USER_NAME));
         assertEquals("Dale Olds", map.getFullName());
@@ -127,8 +151,18 @@ public class UserInfoEndpointTests {
         assertEquals(user.getFamilyName(), map.getAttributeValue(FAMILY_NAME));
         assertNotNull(map.getAttributeValue(USER_ATTRIBUTES));
         Map<String, Object> userAttributes = (Map<String, Object>) map.getAttributeValue(USER_ATTRIBUTES);
-        assertEquals(info.get(MULTI_VALUE), userAttributes.get(MULTI_VALUE));
-        assertEquals(info.get(SINGLE_VALUE), userAttributes.get(SINGLE_VALUE));
+        assertEquals(info.getUserAttributes().get(MULTI_VALUE), userAttributes.get(MULTI_VALUE));
+        assertEquals(info.getUserAttributes().get(SINGLE_VALUE), userAttributes.get(SINGLE_VALUE));
+        assertNull(userAttributes.get(USER_ID));
+        List<String> infoRoles = info.getRoles();
+        assertNotNull(infoRoles);
+        assertThat(infoRoles, containsInAnyOrder(roles.toArray()));
+
+        //remove permissions
+        request = createOauthRequest(Arrays.asList("openid"));
+        map = endpoint.loginInfo(new OAuth2Authentication(request, authentication));
+        assertNull(map.getAttributeValue(USER_ATTRIBUTES));
+        assertNull(map.getAttributeValue(ROLES));
     }
 
     public OAuth2Request createOauthRequest(List<String> scopes) {

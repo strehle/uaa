@@ -25,6 +25,8 @@ import org.cloudfoundry.identity.uaa.provider.AbstractIdentityProviderDefinition
 import org.cloudfoundry.identity.uaa.provider.IdentityProvider;
 import org.cloudfoundry.identity.uaa.provider.LdapIdentityProviderDefinition;
 import org.cloudfoundry.identity.uaa.provider.SamlIdentityProviderDefinition;
+import org.cloudfoundry.identity.uaa.resources.jdbc.LimitSqlAdapterFactory;
+import org.cloudfoundry.identity.uaa.resources.jdbc.SQLServerLimitSqlAdapter;
 import org.cloudfoundry.identity.uaa.zone.IdentityZone;
 import org.junit.After;
 import org.junit.Before;
@@ -192,7 +194,8 @@ public class InvitationsServiceMockMvcTests extends InjectedMockContextTest {
         String email = new RandomValueStringGenerator().generate().toLowerCase() + "@test.org";
         URL inviteLink = inviteUser(email, userInviteToken, null, clientId, OriginKeys.UAA);
 
-        getWebApplicationContext().getBean(JdbcTemplate.class).update("UPDATE users SET verified=true WHERE email=?",email);
+        String dbTrueString = LimitSqlAdapterFactory.getLimitSqlAdapter().getClass().equals(SQLServerLimitSqlAdapter.class) ? "1" : "true";
+        getWebApplicationContext().getBean(JdbcTemplate.class).update("UPDATE users SET verified="+dbTrueString+" WHERE email=?",email);
         assertTrue("User should not be verified", queryUserForField(email, "verified", Boolean.class));
         assertEquals(OriginKeys.UAA, queryUserForField(email, OriginKeys.ORIGIN, String.class));
 
@@ -207,7 +210,7 @@ public class InvitationsServiceMockMvcTests extends InjectedMockContextTest {
     }
 
     @Test
-    public void accept_invitation_for_uaa_user_does_not_expire_invitelink() throws Exception {
+    public void accept_invitation_for_uaa_user_should_expire_invitelink() throws Exception {
         String email = new RandomValueStringGenerator().generate().toLowerCase() + "@test.org";
         URL inviteLink = inviteUser(email, userInviteToken, null, clientId, OriginKeys.UAA);
         assertEquals(OriginKeys.UAA, queryUserForField(email, OriginKeys.ORIGIN, String.class));
@@ -220,7 +223,7 @@ public class InvitationsServiceMockMvcTests extends InjectedMockContextTest {
             .andExpect(status().isOk());
 
         getMockMvc().perform(get)
-            .andExpect(status().isOk());
+            .andExpect(status().isUnprocessableEntity());
     }
 
     @Test

@@ -115,6 +115,28 @@ public class ResetPasswordControllerMockMvcTests extends InjectedMockContextTest
     }
 
     @Test
+    public void testResettingPasswordUpdatesLastLogonTime() throws Exception {
+        List<ScimUser> users = getWebApplicationContext().getBean(ScimUserProvisioning.class).query("username eq \"marissa\"");
+        assertNotNull(users);
+        assertEquals(1, users.size());
+        Long lastLogonBeforeReset = users.get(0).getLastLogonTime();
+        PasswordChange change = new PasswordChange(users.get(0).getId(), users.get(0).getUserName(), users.get(0).getPasswordLastModified(), "", "");
+
+        ExpiringCode code = codeStore.generateCode(JsonUtils.writeValueAsString(change), new Timestamp(System.currentTimeMillis() + UaaResetPasswordService.PASSWORD_RESET_LIFETIME), null);
+
+        MvcResult mvcResult = getMockMvc().perform(createChangePasswordRequest(users.get(0), code, true))
+            .andExpect(status().isFound())
+            .andExpect(redirectedUrl("/"))
+            .andReturn();
+
+        ScimUser userMarissa = getWebApplicationContext().getBean(ScimUserProvisioning.class).retrieve(users.get(0).getId());
+        assertNotNull(userMarissa.getLastLogonTime());
+        if(lastLogonBeforeReset != null) {
+            assertTrue(userMarissa.getLastLogonTime() > lastLogonBeforeReset);
+        }
+    }
+
+    @Test
     public void testResettingAPasswordFailsWhenUsernameChanged() throws Exception {
 
         ScimUserProvisioning userProvisioning = getWebApplicationContext().getBean(ScimUserProvisioning.class);
@@ -160,7 +182,6 @@ public class ResetPasswordControllerMockMvcTests extends InjectedMockContextTest
             .andReturn().getResponse().getContentAsString();
 
         String renderedCode = findInRenderedPage(content, "\\<input type=\\\"hidden\\\" name=\\\"code\\\" value=\\\"(.*?)\\\" \\/\\>");
-        assertEquals(renderedCode, code.getCode());
 
         String renderedEmail = findInRenderedPage(content, "\\<input type=\\\"hidden\\\" name=\\\"email\\\" value=\\\"(.*?)\\\" \\/\\>");
         assertEquals(renderedEmail, user.getPrimaryEmail());
@@ -325,8 +346,6 @@ public class ResetPasswordControllerMockMvcTests extends InjectedMockContextTest
         getMockMvc().perform(createChangePasswordRequest(user, code, true, "d3faultPasswd", "d3faultPasswd"))
             .andExpect(status().isUnprocessableEntity())
             .andExpect(request().attribute("message", equalTo("Your new password cannot be the same as the old password.")))
-            .andExpect(request().attribute("code", equalTo(code.getCode())))
-            .andExpect(request().attribute("email", equalTo(user.getPrimaryEmail())))
             .andExpect(forwardedUrl("/reset_password"));
     }
 
@@ -354,8 +373,6 @@ public class ResetPasswordControllerMockMvcTests extends InjectedMockContextTest
         getMockMvc().perform(createChangePasswordRequest(user, code, true, "a", "a"))
             .andExpect(status().isUnprocessableEntity())
             .andExpect(request().attribute("message", equalTo("Password must be at least 3 characters in length.")))
-            .andExpect(request().attribute("code", equalTo(code.getCode())))
-            .andExpect(request().attribute("email", equalTo(user.getPrimaryEmail())))
             .andExpect(forwardedUrl("/reset_password"));
 
         uaaProvider = getWebApplicationContext().getBean(IdentityProviderProvisioning.class).retrieveByOrigin(UAA, IdentityZone.getUaa().getId());
