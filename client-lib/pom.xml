@@ -11,7 +11,7 @@
   <groupId>org.cloudfoundry.identity</groupId>
   <artifactId>cloudfoundry-identity-client-lib</artifactId>
   <version>3.10.0-SNAPSHOT</version>
-  <name>UAA</name>
+  <name>UAA Client Library</name>
   <description>Cloud Foundry User Account and Authentication</description>
   <url>http://github.com//cloudfoundry/uaa</url>
   <inceptionYear>2011</inceptionYear>
