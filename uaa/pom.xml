@@ -62,7 +62,6 @@
       <groupId>org.flywaydb</groupId>
       <artifactId>flyway-core</artifactId>
       <version>4.0</version>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>dumbster</groupId>
@@ -73,19 +72,13 @@
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
-      <version>4.11</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>4.11</version>
+      <version>4.12</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.springframework.security</groupId>
       <artifactId>spring-security-test</artifactId>
-      <version>4.0.3.RELEASE</version>
+      <version>4.1.2.RELEASE</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -115,7 +108,7 @@
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-test</artifactId>
-      <version>4.2.2.RELEASE</version>
+      <version>4.3.1.RELEASE</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -127,13 +120,7 @@
     <dependency>
       <groupId>org.springframework.security</groupId>
       <artifactId>spring-security-config</artifactId>
-      <version>4.0.3.RELEASE</version>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>javax.servlet</groupId>
-      <artifactId>jstl</artifactId>
-      <version>1.2</version>
+      <version>4.1.2.RELEASE</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
@@ -141,12 +128,32 @@
       <artifactId>cloudfoundry-identity-server</artifactId>
       <version>3.10.0-SNAPSHOT</version>
       <scope>compile</scope>
+      <exclusions>
+            <exclusion>
+                    <artifactId>bcprov-jdk15</artifactId>
+                    <groupId>org.bouncycastle</groupId>
+            </exclusion>
+            <exclusion>
+                    <artifactId>xmariadb-java-client</artifactId>
+                    <groupId>org.mariadb.jdbc</groupId>
+            </exclusion>
+            <exclusion>
+                    <artifactId>xhsqldb</artifactId>
+                    <groupId>org.hsqldb</groupId>
+            </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.cloudfoundry.identity</groupId>
-      <artifactId>cloudfoundry-identity-client-lib</artifactId>
+      <artifactId>cloudfoundry-identity-model</artifactId>
       <version>3.10.0-SNAPSHOT</version>
       <scope>compile</scope>
+      <exclusions>
+            <exclusion>
+                 <groupId>org.springframework.security.oauth</groupId>
+                  <artifactId>spring-security-oauth</artifactId>
+            </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.github.detro.ghostdriver</groupId>
@@ -157,7 +164,7 @@
     <dependency>
       <groupId>org.apache.tomcat</groupId>
       <artifactId>tomcat-jdbc</artifactId>
-      <version>7.0.68</version>
+      <version>8.0.39</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
@@ -213,6 +220,38 @@
       <artifactId>mockito-all</artifactId>
       <version>1.8.5</version>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <artifactId>bcprov-jdk15on</artifactId>
+      <groupId>org.bouncycastle</groupId>
+      <version>1.56</version>
+    </dependency>
+    <dependency>
+      <artifactId>bcpkix-jdk15on</artifactId>
+      <groupId>org.bouncycastle</groupId>
+      <version>1.56</version>
+    </dependency>
+    <dependency>
+      <groupId>org.opensaml</groupId>
+      <artifactId>opensaml</artifactId>
+      <version>2.6.4</version>
+      <exclusions>
+            <exclusion>
+                    <groupId>org.apache.velocity</groupId>
+                    <artifactId>velocity</artifactId>
+            </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+        <groupId>com.microsoft.sqlserver</groupId>
+        <artifactId>mssql-jdbc</artifactId>
+        <version>6.1.0.jre8</version>
+        <exclusions>
+            <exclusion>
+                <artifactId>*</artifactId>
+                <groupId>*</groupId>
+            </exclusion>
+        </exclusions>
     </dependency>
   </dependencies>
 </project>
