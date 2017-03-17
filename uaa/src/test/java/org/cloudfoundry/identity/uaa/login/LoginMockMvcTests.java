@@ -120,6 +120,7 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
@@ -217,6 +218,24 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
                 get("/login"))
             .andExpect(status().isOk())
             .andExpect(cookie().maxAge(CookieBasedCsrfTokenRepository.DEFAULT_CSRF_COOKIE_NAME, CookieBasedCsrfTokenRepository.DEFAULT_COOKIE_MAX_AGE));
+    }
+
+    @Test
+    public void testLogin_Csrf_Reset_On_Refresh() throws Exception {
+        MvcResult mvcResult = getMockMvc()
+            .perform(
+                get("/login"))
+            .andReturn();
+        Cookie csrf1 = mvcResult.getResponse().getCookie(CookieBasedCsrfTokenRepository.DEFAULT_CSRF_COOKIE_NAME);
+
+        mvcResult = getMockMvc()
+            .perform(
+                get("/login")
+                    .cookie(csrf1))
+            .andReturn();
+        Cookie csrf2 = mvcResult.getResponse().getCookie(CookieBasedCsrfTokenRepository.DEFAULT_CSRF_COOKIE_NAME);
+        assertNotNull(csrf2);
+        assertNotEquals(csrf1.getValue(), csrf2.getValue());
     }
 
     protected void setDisableInternalAuth(boolean disable) throws Exception {
@@ -2001,7 +2020,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         savedAccount.setUsername("test@example.org");
         getMockMvc().perform(get("/login")
             .session(session)
-            .cookie(new Cookie("Saved-Account-12345678", JsonUtils.writeValueAsString(savedAccount)))
+            .cookie(new Cookie("Saved-Account-12345678", URLEncoder.encode(JsonUtils.writeValueAsString(savedAccount))))
             .header("Accept", TEXT_HTML)
             .with(new SetServerNameRequestPostProcessor(zone.getSubdomain() + ".localhost")))
             .andExpect(status().isOk())
