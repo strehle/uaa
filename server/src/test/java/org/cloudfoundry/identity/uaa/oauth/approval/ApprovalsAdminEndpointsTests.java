@@ -18,8 +18,6 @@ import org.cloudfoundry.identity.uaa.approval.Approval.ApprovalStatus;
 import org.cloudfoundry.identity.uaa.approval.ApprovalsAdminEndpoints;
 import org.cloudfoundry.identity.uaa.approval.JdbcApprovalStore;
 import org.cloudfoundry.identity.uaa.error.UaaException;
-import org.cloudfoundry.identity.uaa.resources.jdbc.JdbcPagingListFactory;
-import org.cloudfoundry.identity.uaa.resources.jdbc.SimpleSearchQueryConverter;
 import org.cloudfoundry.identity.uaa.security.SecurityContextAccessor;
 import org.cloudfoundry.identity.uaa.test.JdbcTestBase;
 import org.cloudfoundry.identity.uaa.test.TestUtils;
@@ -33,9 +31,12 @@ import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.oauth2.provider.NoSuchClientException;
 import org.springframework.security.oauth2.provider.client.BaseClientDetails;
 import org.springframework.security.oauth2.provider.client.InMemoryClientDetailsService;
 
@@ -65,6 +66,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 public class ApprovalsAdminEndpointsTests extends JdbcTestBase {
+
+    @Rule
+    public ExpectedException exception = ExpectedException.none();
+
     private UaaTestAccounts testAccounts = null;
 
     private JdbcApprovalStore dao;
@@ -88,8 +93,7 @@ public class ApprovalsAdminEndpointsTests extends JdbcTestBase {
         marissa = userDao.retrieveUserById(userId);
         assertNotNull(marissa);
 
-        dao = new JdbcApprovalStore(jdbcTemplate, new JdbcPagingListFactory(jdbcTemplate, limitSqlAdapter),
-                        new SimpleSearchQueryConverter());
+        dao = new JdbcApprovalStore(jdbcTemplate);
         endpoints = new ApprovalsAdminEndpoints();
         endpoints.setApprovalStore(dao);
         endpoints.setUaaUserDatabase(userDao);
@@ -129,6 +133,20 @@ public class ApprovalsAdminEndpointsTests extends JdbcTestBase {
         TestUtils.deleteFrom(dataSource, "users");
         assertThat(jdbcTemplate.queryForObject("select count(*) from authz_approvals", Integer.class), is(0));
         assertThat(jdbcTemplate.queryForObject("select count(*) from users", Integer.class), is(0));
+    }
+
+    @Test
+    public void validate_client_id_on_revoke() throws Exception {
+        exception.expect(NoSuchClientException.class);
+        exception.expectMessage("No client with requested id: invalid_id");
+        endpoints.revokeApprovals("invalid_id");
+    }
+
+    @Test
+    public void validate_client_id_on_update() throws Exception {
+        exception.expect(NoSuchClientException.class);
+        exception.expectMessage("No client with requested id: invalid_id");
+        endpoints.updateClientApprovals("invalid_id", new Approval[0]);
     }
 
     @Test
@@ -361,12 +379,28 @@ public class ApprovalsAdminEndpointsTests extends JdbcTestBase {
         assertThat(doWithTiming("revokeApprovalsCount", "client_id eq \"c2\""), lessThan(5d) );
     }
 
-    public void revokeApprovalsCount(String filter) {
-        assertTrue(dao.revokeApprovals(filter));
+    public void revokeApprovalsCountForUser(String userId) {
+        assertTrue(dao.revokeApprovalsForClient(userId));
     }
 
-    public int getApprovalsCount(String filter) {
-        return dao.getApprovals(filter).size();
+    public void revokeApprovalsCountForClient(String clientId) {
+        assertTrue(dao.revokeApprovalsForClient(clientId));
+    }
+
+    public void revokeApprovalsCountForClientAndUser(String clientId, String userId) {
+        assertTrue(dao.revokeApprovalsForClientAndUser(clientId, userId));
+    }
+
+    public int getApprovalsCountForUser(String userId) {
+        return dao.getApprovalsForUser(userId).size();
+    }
+
+    public int getApprovalsCountForClient(String clientId) {
+        return dao.getApprovalsForClient(clientId).size();
+    }
+
+    public int getApprovalsCount(String clientId, String userId) {
+        return dao.getApprovals(userId, clientId).size();
     }
 
     public void rebuildIndices() {

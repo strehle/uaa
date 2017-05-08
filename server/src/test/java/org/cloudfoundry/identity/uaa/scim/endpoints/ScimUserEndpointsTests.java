@@ -200,7 +200,7 @@ public class ScimUserEndpointsTests {
         map.put(HttpMediaTypeException.class, HttpStatus.BAD_REQUEST);
         endpoints.setStatuses(map);
 
-        am = new JdbcApprovalStore(jdbcTemplate, pagingListFactory, new ScimSearchQueryConverter());
+        am = new JdbcApprovalStore(jdbcTemplate);
         endpoints.setApprovalStore(am);
     }
 
@@ -707,7 +707,7 @@ public class ScimUserEndpointsTests {
         endpoints.setApprovalStore(mockApprovalStore);
 
         endpoints.findUsers("", "id pr", null, "ascending", 1, 100);
-        verify(mockApprovalStore, atLeastOnce()).getApprovals(anyString());
+        verify(mockApprovalStore, atLeastOnce()).getApprovalsForUser(anyString());
 
         endpoints.setApprovalStore(am);
     }
@@ -718,7 +718,7 @@ public class ScimUserEndpointsTests {
         endpoints.setApprovalStore(mockApprovalStore);
 
         endpoints.findUsers("approvals", "id pr", null, "ascending", 1, 100);
-        verify(mockApprovalStore, atLeastOnce()).getApprovals(anyString());
+        verify(mockApprovalStore, atLeastOnce()).getApprovalsForUser(anyString());
 
         endpoints.setApprovalStore(am);
     }
