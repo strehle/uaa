@@ -141,15 +141,6 @@ public class IdentityZoneConfigurationBootstrapTests extends JdbcTestBase {
     }
 
     @Test
-    public void null_home_redirect() throws Exception {
-        bootstrap.setHomeRedirect("null");
-        bootstrap.afterPropertiesSet();
-
-        IdentityZone zone = provisioning.retrieve(IdentityZone.getUaa().getId());
-        assertNull(zone.getConfig().getLinks().getHomeRedirect());
-    }
-
-    @Test
     public void signup_link_configured() throws Exception {
         links.put("signup", "/configured_signup");
         bootstrap.setSelfServiceLinks(links);
@@ -157,7 +148,7 @@ public class IdentityZoneConfigurationBootstrapTests extends JdbcTestBase {
 
         IdentityZone zone = provisioning.retrieve(IdentityZone.getUaa().getId());
         assertEquals("/configured_signup", zone.getConfig().getLinks().getSelfService().getSignup());
-        assertEquals("/forgot_password", zone.getConfig().getLinks().getSelfService().getPasswd());
+        assertNull(zone.getConfig().getLinks().getSelfService().getPasswd());
     }
 
     @Test
@@ -167,7 +158,7 @@ public class IdentityZoneConfigurationBootstrapTests extends JdbcTestBase {
         bootstrap.afterPropertiesSet();
 
         IdentityZone zone = provisioning.retrieve(IdentityZone.getUaa().getId());
-        assertEquals("/create_account", zone.getConfig().getLinks().getSelfService().getSignup());
+        assertNull(zone.getConfig().getLinks().getSelfService().getSignup());
         assertEquals("/configured_passwd", zone.getConfig().getLinks().getSelfService().getPasswd());
     }
 
