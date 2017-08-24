@@ -277,8 +277,8 @@ _Response Fields_
 
 ## SAML2 Bearer Grant
 
-<aside class="notice">
-  Planed for UAA 3.9.x
+<aside class="success">
+  Added in 3.10.0
 </aside>
 
 The SAML 2.0 bearer grant allows to request an OAuth 2.0 access token with a SAML 2.0 bearer assertion. The flow is defined in 
@@ -304,8 +304,8 @@ _Response Fields_
 
 ## JWT Bearer Token Grant
 
-<aside class="notice">
-  From 4.4.x
+<aside class="success">
+  Added in 4.5.0
 </aside>
 
 The _JSON Web Token (JWT) Profile for OAuth 2.0 Client Authentication and Authorization Grants_
@@ -495,6 +495,10 @@ _Request Headers_
 
 <%= ERB.new(File.read("../../build/generated-snippets/TokenKeyEndpointDocs/getTokenAsymmetricAuthenticated/request-headers.md")).result(binding) %>
 
+_Response Headers_
+
+<%= ERB.new(File.read("../../build/generated-snippets/TokenKeyEndpointDocs/getTokenAsymmetricAuthenticated/response-headers.md")).result(binding) %>
+
 _Response Fields_
 
 <%= ERB.new(File.read("../../build/generated-snippets/TokenKeyEndpointDocs/getTokenAsymmetricAuthenticated/response-fields.md")).result(binding) %>
@@ -537,6 +541,10 @@ An endpoint which returns the list of JWT keys. To support key rotation, this li
 _Request Headers_
 
 <%= ERB.new(File.read("../../build/generated-snippets/TokenKeyEndpointDocs/checkTokenKeysValues/request-headers.md")).result(binding) %>
+
+_Response Headers_
+
+<%= ERB.new(File.read("../../build/generated-snippets/TokenKeyEndpointDocs/checkTokenKeysValues/response-headers.md")).result(binding) %>
 
 _Response Fields_
 
@@ -754,6 +762,10 @@ _Error Codes_
 <%= ERB.new(File.read("../../build/generated-snippets/IdentityProviderEndpointsDocs/createSAMLIdentityProvider/curl-request.md")).result(binding) %>
 <%= ERB.new(File.read("../../build/generated-snippets/IdentityProviderEndpointsDocs/createSAMLIdentityProvider/http-request.md")).result(binding) %>
 <%= ERB.new(File.read("../../build/generated-snippets/IdentityProviderEndpointsDocs/createSAMLIdentityProvider/http-response.md")).result(binding) %>
+
+<%= ERB.new(File.read("../../build/generated-snippets/IdentityProviderEndpointsDocs/createSAMLIdentityProviderMetadataUrl/curl-request.md")).result(binding) %>
+<%= ERB.new(File.read("../../build/generated-snippets/IdentityProviderEndpointsDocs/createSAMLIdentityProviderMetadataUrl/http-request.md")).result(binding) %>
+<%= ERB.new(File.read("../../build/generated-snippets/IdentityProviderEndpointsDocs/createSAMLIdentityProviderMetadataUrl/http-response.md")).result(binding) %>
 
 _Request Headers_
 
@@ -1279,6 +1291,10 @@ uaac user get testuser
 
 ## List
 
+Listing users supports <a href="http://www.simplecloud.info/specs/draft-scim-api-01.html#query-resources">SCIM filtering</a> on the available attributes.
+By default users are returned with their group memberships and approvals, a rather expensive operation. 
+To avoid this, perform the search by including the `attributes` parameter to reduce the results.
+
 <%= ERB.new(File.read("../../build/generated-snippets/ScimUserEndpointDocs/test_Find_Users/curl-request.md")).result(binding) %>
 <%= ERB.new(File.read("../../build/generated-snippets/ScimUserEndpointDocs/test_Find_Users/http-request.md")).result(binding) %>
 <%= ERB.new(File.read("../../build/generated-snippets/ScimUserEndpointDocs/test_Find_Users/http-response.md")).result(binding) %>
@@ -1301,7 +1317,7 @@ _Error Codes_
 |------------|--------------------------------------------------------------------------------------------------------|
 | 400        | Bad Request - invalid JSON format or missing fields                                                    |
 | 401        | Unauthorized - Invalid token                                                                           |
-| 403        | Forbidden - Insufficient scope (scim.read is required to search users)                                  |
+| 403        | Forbidden - Insufficient scope (scim.read is required to search users)                                 |
 
 >Example using uaac to view users:
 
@@ -1312,6 +1328,29 @@ uaac token client get admin -s adminsecret
 
 uaac users
 ```
+
+## List with Attribute Filtering
+
+Listing users supports <a href="http://www.simplecloud.info/specs/draft-scim-api-01.html#query-resources">SCIM filtering</a> on the available attributes.
+When users are searched we can return only selected amount of data using filtering.
+The attribute `groups` will cause the UAA to query the group memberships and include them in the result making the operation more expensive.
+The attribute `approvals` will cause the UAA to query the user approvals and include them in the result making the operation more expensive.
+
+<%= ERB.new(File.read("../../build/generated-snippets/ScimUserEndpointDocs/test_Find_With_Attributes_Users/curl-request.md")).result(binding) %>
+<%= ERB.new(File.read("../../build/generated-snippets/ScimUserEndpointDocs/test_Find_With_Attributes_Users/http-request.md")).result(binding) %>
+<%= ERB.new(File.read("../../build/generated-snippets/ScimUserEndpointDocs/test_Find_With_Attributes_Users/http-response.md")).result(binding) %>
+
+_Request Headers_
+
+<%= ERB.new(File.read("../../build/generated-snippets/ScimUserEndpointDocs/test_Find_With_Attributes_Users/request-headers.md")).result(binding) %>
+
+_Request Parameters_
+
+<%= ERB.new(File.read("../../build/generated-snippets/ScimUserEndpointDocs/test_Find_With_Attributes_Users/request-parameters.md")).result(binding) %>
+
+_Response Fields_
+
+<%= ERB.new(File.read("../../build/generated-snippets/ScimUserEndpointDocs/test_Find_With_Attributes_Users/response-fields.md")).result(binding) %>
 
 ## Create
 
@@ -2414,6 +2453,10 @@ _Request Headers_
 _Request Parameters_
 
 <%= ERB.new(File.read("../../build/generated-snippets/PasswordEndpointsDocs/document_password_reset/request-parameters.md")).result(binding) %>
+
+_Request Body_
+
+The required request body of this request is the user's username, typically an email address, in form of a JSON string.<br/>
 
 _Response Body_
 

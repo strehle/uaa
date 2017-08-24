@@ -110,7 +110,10 @@ import static org.springframework.util.StringUtils.isEmpty;
  * @see <a href="http://www.simplecloud.info">SCIM specs</a>
  */
 @Controller
-@ManagedResource
+@ManagedResource(
+    objectName="cloudfoundry.identity:name=UserEndpoint",
+    description = "UAA User API Metrics"
+)
 public class ScimUserEndpoints implements InitializingBean, ApplicationEventPublisherAware {
     private static final String USER_APPROVALS_FILTER_TEMPLATE = "user_id eq \"%s\"";
 
@@ -235,7 +238,7 @@ public class ScimUserEndpoints implements InitializingBean, ApplicationEventPubl
             passwordValidator.validate(user.getPassword());
         }
 
-        ScimUser scimUser = scimUserProvisioning.createUser(user, user.getPassword());
+        ScimUser scimUser = scimUserProvisioning.createUser(user, user.getPassword(), IdentityZoneHolder.get().getId());
         if (user.getApprovals()!=null) {
             for (Approval approval : user.getApprovals()) {
                 approval.setUserId(scimUser.getId());
@@ -359,7 +362,7 @@ public class ScimUserEndpoints implements InitializingBean, ApplicationEventPubl
                     @RequestHeader(value = "If-Match", required = false) String etag,
                     HttpServletResponse httpServletResponse) {
         int version = etag == null ? -1 : getVersion(userId, etag);
-        ScimUser user = scimUserProvisioning.verifyUser(userId, version);
+        ScimUser user = scimUserProvisioning.verifyUser(userId, version, IdentityZoneHolder.get().getId());
         scimUpdates.incrementAndGet();
         addETagHeader(httpServletResponse, user);
         return user;
@@ -401,7 +404,7 @@ public class ScimUserEndpoints implements InitializingBean, ApplicationEventPubl
         List<ScimUser> input = new ArrayList<ScimUser>();
         List<ScimUser> result;
         try {
-            result = scimUserProvisioning.query(filter, sortBy, sortOrder.equals("ascending"));
+            result = scimUserProvisioning.query(filter, sortBy, sortOrder.equals("ascending"), IdentityZoneHolder.get().getId());
             for (ScimUser user : UaaPagingUtils.subList(result, startIndex, count)) {
                 if(attributesCommaSeparated == null || attributesCommaSeparated.matches("(?i)groups") || attributesCommaSeparated.isEmpty()) {
                     syncGroups(user);
@@ -458,7 +461,7 @@ public class ScimUserEndpoints implements InitializingBean, ApplicationEventPubl
             publish(new UserAccountUnlockedEvent(user));
         }
         if(status.isPasswordChangeRequired() != null && status.isPasswordChangeRequired()) {
-            scimUserProvisioning.updatePasswordChangeRequired(userId, true);
+            scimUserProvisioning.updatePasswordChangeRequired(userId, true, IdentityZoneHolder.get().getId());
         }
 
         return status;

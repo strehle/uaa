@@ -58,6 +58,7 @@ import org.cloudfoundry.identity.uaa.zone.ClientServicesExtension;
 import org.cloudfoundry.identity.uaa.zone.IdentityZone;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneProvisioning;
+import org.cloudfoundry.identity.uaa.zone.UserConfig;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -503,7 +504,7 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
         String username = "testuser"+ generator.generate();
         String userScopes = "uaa.user";
         ScimUser user = setUpUser(username, userScopes, OriginKeys.UAA, IdentityZone.getUaa().getId());
-        userProvisioning.updatePasswordChangeRequired(user.getId(), true);
+        userProvisioning.updatePasswordChangeRequired(user.getId(), true, IdentityZoneHolder.get().getId());
 
         String response = getMockMvc().perform(
             post("/oauth/token")
@@ -600,7 +601,7 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
         Object refreshToken = tokens.get(REFRESH_TOKEN);
         String refreshTokenId = (String) refreshToken;
 
-        List<ScimGroup> groups = getWebApplicationContext().getBean(ScimGroupProvisioning.class).query("displayName eq \"uaa.admin\"");
+        List<ScimGroup> groups = getWebApplicationContext().getBean(ScimGroupProvisioning.class).query("displayName eq \"uaa.admin\"", IdentityZoneHolder.get().getId());
         assertEquals(1, groups.size());
         getWebApplicationContext().getBean(ScimGroupMembershipManager.class).removeMemberById(groups.get(0).getId(), scimUser.getId(), IdentityZoneHolder.get().getId());
 
@@ -3706,6 +3707,31 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
     }
 
     @Test
+    public void misconfigured_jwt_keys_returns_proper_error() throws Exception {
+        String subdomain = "testzone" + generator.generate();
+        IdentityZone testZone = setupIdentityZone(subdomain);
+        testZone.getConfig().getTokenPolicy().setActiveKeyId("invalid-active-key");
+        identityZoneProvisioning.update(testZone);
+        IdentityZoneHolder.set(testZone);
+        String clientId = "testclient" + generator.generate();
+        String scopes = "space.*.developer,space.*.admin,org.*.reader,org.123*.admin,*.*,*";
+        setUpClients(clientId, scopes, scopes, GRANT_TYPES, true);
+        IdentityZoneHolder.clear();
+
+        getMockMvc().perform(post("http://localhost/oauth/token")
+                                 .accept(MediaType.APPLICATION_JSON_VALUE)
+                                 .header("Host", subdomain + ".localhost")
+                                 .header("Authorization", "Basic " + new String(Base64.encode((clientId + ":" + SECRET).getBytes())))
+                                 .param("grant_type", "client_credentials")
+                                 .param("client_id", clientId)
+                                 .param("client_secret", SECRET))
+            .andDo(print())
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.error").value("unauthorized"))
+            .andExpect(jsonPath("$.error_description").value("Unable to sign token, misconfigured JWT signing keys"));
+    }
+
+    @Test
     public void testGetClientCredentialsTokenForOtherIdentityZoneFromDefaultZoneFails() throws Exception {
         String subdomain = "testzone"+ generator.generate();
         IdentityZone testZone = setupIdentityZone(subdomain);
@@ -3808,6 +3834,31 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
             .param(OAuth2Utils.CLIENT_ID, clientId))
             .andExpect(status().isForbidden())
             .andExpect(content().string("{\"error\":\"access_denied\",\"error_description\":\"Your current password has expired. Please reset your password.\"}"));
+    }
+
+    @Test
+    public void password_grant_with_default_user_groups_in_zone() throws Exception {
+        String username = generator.generate()+"@test.org";
+        String subdomain = "testzone"+ generator.generate();
+        String clientId = "testclient" + generator.generate();
+        List<String> defaultGroups = new LinkedList(Arrays.asList("custom.default.group", "other.default.group"));
+        defaultGroups.addAll(UserConfig.DEFAULT_ZONE_GROUPS);
+        createNonDefaultZone(username, subdomain, clientId, defaultGroups, "custom.default.group,openid");
+
+        MvcResult result = getMockMvc().perform(post("/oauth/token")
+                                                    .with(new SetServerNameRequestPostProcessor(subdomain + ".localhost"))
+                                                    .param("username", username)
+                                                    .param("password", "secret")
+                                                    .header("Authorization", "Basic " + new String(Base64.encode((clientId + ":" + SECRET).getBytes())))
+                                                    .param(OAuth2Utils.RESPONSE_TYPE, "token")
+                                                    .param(OAuth2Utils.GRANT_TYPE, "password")
+                                                    .param(OAuth2Utils.CLIENT_ID, clientId))
+            .andExpect(status().isOk())
+            .andReturn();
+        String claimsJSON = JwtHelper.decode(JsonUtils.readValue(result.getResponse().getContentAsString(), OAuthToken.class).accessToken).getClaims();
+        Claims claims = JsonUtils.readValue(claimsJSON, Claims.class);
+        assertEquals(claims.getIss(), "http://" + subdomain.toLowerCase() + ".localhost:8080/uaa/oauth/token");
+        assertThat(claims.getScope(), containsInAnyOrder("openid", "custom.default.group"));
     }
 
     @Test
@@ -4002,10 +4053,13 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
     }
 
     protected void createNonDefaultZone(String username, String subdomain, String clientId) {
-        IdentityZone testZone = setupIdentityZone(subdomain);
+        createNonDefaultZone(username, subdomain, clientId, UserConfig.DEFAULT_ZONE_GROUPS, "cloud_controller.read");
+    }
+
+    protected void createNonDefaultZone(String username, String subdomain, String clientId, List<String> defaultUserGroups, String scopes) {
+        IdentityZone testZone = setupIdentityZone(subdomain, defaultUserGroups);
         IdentityZoneHolder.set(testZone);
         IdentityProvider provider = setupIdentityProvider();
-        String scopes = "cloud_controller.read";
         setUpClients(clientId, scopes, scopes, "password,client_credentials", true, TEST_REDIRECT_URI, Arrays.asList(provider.getOriginKey()));
         setUpUser(username);
         IdentityZoneHolder.clear();
@@ -4112,7 +4166,7 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
         email.setValue(username);
         scimUser.setEmails(Arrays.asList(email));
         scimUser.setOrigin(OriginKeys.UAA);
-        return jdbcScimUserProvisioning.createUser(scimUser, "secret");
+        return jdbcScimUserProvisioning.createUser(scimUser, "secret", IdentityZoneHolder.get().getId());
     }
 
     public static class MockSecurityContext implements SecurityContext {

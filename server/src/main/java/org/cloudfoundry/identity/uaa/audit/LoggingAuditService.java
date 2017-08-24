@@ -12,14 +12,15 @@
  *******************************************************************************/
 package org.cloudfoundry.identity.uaa.audit;
 
-import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.cloudfoundry.identity.uaa.logging.LogSanitizerUtil;
 import org.springframework.jmx.export.annotation.ManagedMetric;
 import org.springframework.jmx.export.annotation.ManagedResource;
 import org.springframework.jmx.support.MetricType;
+
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Audit service implementation which just outputs the relevant information
@@ -31,9 +32,13 @@ import org.springframework.jmx.support.MetricType;
  * @author Dave Syer
  */
 @ManagedResource
+//(
+//    objectName="cloudfoundry.identity:name=UaaAudit",
+//    description = "UAA Audit Metrics"
+//)
 public class LoggingAuditService implements UaaAuditService {
 
-    private final Log logger = LogFactory.getLog("UAA.Audit");
+    private Log logger = LogFactory.getLog("UAA.Audit");
 
     private AtomicInteger userAuthenticationCount = new AtomicInteger();
 
@@ -145,15 +150,21 @@ public class LoggingAuditService implements UaaAuditService {
     }
 
     private void log(String msg) {
+        String sanitized = LogSanitizerUtil.sanitize(msg);
+
         if (logger.isTraceEnabled()) {
             StringBuilder output = new StringBuilder(256);
             output.append("\n************************************************************\n");
-            output.append(msg);
+            output.append(sanitized);
             output.append("\n\n************************************************************\n");
             logger.trace(output.toString());
         }
         else {
-            logger.info(msg);
+            logger.info(sanitized);
         }
+    }
+
+    public void setLogger(Log logger) {
+        this.logger = logger;
     }
 }

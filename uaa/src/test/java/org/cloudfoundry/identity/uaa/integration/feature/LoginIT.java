@@ -16,6 +16,9 @@ import com.dumbster.smtp.SimpleSmtpServer;
 import com.dumbster.smtp.SmtpMessage;
 import org.cloudfoundry.identity.uaa.integration.util.IntegrationTestUtils;
 import org.cloudfoundry.identity.uaa.security.web.CookieBasedCsrfTokenRepository;
+import org.cloudfoundry.identity.uaa.zone.BrandingInformation;
+import org.cloudfoundry.identity.uaa.zone.BrandingInformation.Banner;
+import org.cloudfoundry.identity.uaa.zone.IdentityZoneConfiguration;
 import org.hamcrest.MatcherAssert;
 import org.hamcrest.Matchers;
 import org.junit.After;
@@ -24,6 +27,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,6 +59,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
@@ -102,7 +107,7 @@ public class LoginIT {
         requestBody.add("username", testAccounts.getUserName());
         requestBody.add("password", testAccounts.getPassword());
 
-        headers.set(headers.ACCEPT, MediaType.TEXT_HTML_VALUE);
+        headers.set(HttpHeaders.ACCEPT, MediaType.TEXT_HTML_VALUE);
         ResponseEntity<String> loginResponse = template.exchange(baseUrl + "/login",
                                                                  HttpMethod.GET,
                                                                  new HttpEntity<>(null, headers),
@@ -136,6 +141,66 @@ public class LoginIT {
             }
         }
         assertTrue("Did not find JSESSIONID", jsessionIdValidated);
+    }
+
+    @Test
+    public void skipDiscoveryWillCarryProvidedUsername() {
+        String zoneId = "testzone3";
+
+        RestTemplate identityClient = IntegrationTestUtils.getClientCredentialsTemplate(
+            IntegrationTestUtils.getClientCredentialsResource(baseUrl, new String[]{"zones.write", "zones.read", "scim.zones"}, "identity", "identitysecret")
+        );
+        IdentityZoneConfiguration config = new IdentityZoneConfiguration();
+        config.setIdpDiscoveryEnabled(true);
+        IntegrationTestUtils.createZoneOrUpdateSubdomain(identityClient, baseUrl, zoneId, zoneId, config);
+
+        String zoneUrl = baseUrl.replace("localhost",zoneId+".localhost");
+        webDriver.get(zoneUrl);
+        assertEquals(webDriver.findElement(By.cssSelector("input[name=skipDiscovery]")).getAttribute("value"), "Skip Discovery");
+
+        webDriver.findElement(By.cssSelector("input[name=skipDiscovery]")).click();
+        assertEquals(zoneUrl + "/login?discoveryPerformed=true", webDriver.getCurrentUrl());
+        assertEquals("true", webDriver.findElement(By.cssSelector("input[name=username]")).getAttribute("autofocus"));
+        webDriver.navigate().back();
+
+        webDriver.findElement(By.cssSelector("input#email")).sendKeys("someUser");
+        webDriver.findElement(By.cssSelector("input[name=skipDiscovery]")).click();
+        assertEquals(zoneUrl + "/login?discoveryPerformed=true&providedUsername=someUser", webDriver.getCurrentUrl());
+        assertEquals("someUser", webDriver.findElement(By.cssSelector("input[name=username]")).getAttribute("value"));
+        assertEquals("true", webDriver.findElement(By.cssSelector("input[name=password]")).getAttribute("autofocus"));
+    }
+
+    @Test
+    public void testBannerFunctionalityInDiscoveryPage() {
+        String zoneId = "testzone3";
+
+        RestTemplate identityClient = IntegrationTestUtils.getClientCredentialsTemplate(
+            IntegrationTestUtils.getClientCredentialsResource(baseUrl, new String[]{"zones.write", "zones.read", "scim.zones"}, "identity", "identitysecret")
+        );
+        IdentityZoneConfiguration config = new IdentityZoneConfiguration();
+        config.setIdpDiscoveryEnabled(true);
+        Banner banner = new Banner();
+        banner.setText("test banner");
+        banner.setBackgroundColor("rgba(68, 68, 68, 1)");
+        banner.setTextColor("rgba(17, 17, 17, 1)");
+        config.setBranding(new BrandingInformation());
+        config.getBranding().setBanner(banner);
+        IntegrationTestUtils.createZoneOrUpdateSubdomain(identityClient, baseUrl, zoneId, zoneId, config);
+
+        String zoneUrl = baseUrl.replace("localhost",zoneId+".localhost");
+        webDriver.get(zoneUrl);
+        assertEquals("test banner", webDriver.findElement(By.cssSelector(".login-header span")).getText());
+        assertEquals("rgba(68, 68, 68, 1)", webDriver.findElement(By.cssSelector(".login-header")).getCssValue("background-color"));
+        assertEquals("rgba(17, 17, 17, 1)", webDriver.findElement(By.cssSelector(".login-header span")).getCssValue("color"));
+
+        String base64Val = "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAATBJREFUeNqk008og3Ecx/HNnrJSu63kIC5qKRe7KeUiOSulTHJUTrsr0y5ycFaEgyQXElvt5KDYwU0uO2hSUy4KoR7v7/qsfmjPHvzq1e/XU8/39/3zPFHf9yP/WV7jED24nGRbxDFWUAsToM05zyKFLG60d/wmQBxWzwyOlMU1phELEyCmtPeRQRoVbKOM0VYB6q0QW+3IYQpJFFDEYFCAiMqwNY857Ko3SxjGBTbRXb+xMUamcMbWh148YwJvOHSCdyqTAdxZo72ADGwKT98C9CChcxUPQSVYLz50toae4Fy9WcAISl7AiN/RhS1N5RV5rOLxx5eom90pvGAI/VjHMm6bfspK18a1gXvsqM41XDVL052C1Tim56cYd/rR+mdSrXGluxfm5S8Z/HV9CjAAvQZLXoa5mpgAAAAASUVORK5CYII=";
+        banner.setLogo(base64Val);
+
+        IntegrationTestUtils.createZoneOrUpdateSubdomain(identityClient, baseUrl, zoneId, zoneId, config);
+        webDriver.get(zoneUrl);
+
+        assertEquals("data:image/png;base64," + base64Val, webDriver.findElement(By.cssSelector(".login-header img")).getAttribute("src"));
+        assertEquals(2, webDriver.findElement(By.cssSelector(".login-header")).findElements(By.xpath(".//*")).size());
     }
 
     @Test
@@ -253,6 +318,12 @@ public class LoginIT {
     }
 
     @Test
+    public void testLoginPageReloadBasedOnCsrf() {
+        webDriver.get(baseUrl + "/login");
+        assertTrue(webDriver.getPageSource().contains("http-equiv=\"refresh\""));
+    }
+
+    @Test
     public void userLockedoutAfterFailedAttempts() throws Exception {
         String userEmail = createAnotherUser();
 
@@ -280,6 +351,21 @@ public class LoginIT {
         String regex = "Version: \\S+, Commit: \\w{7}, Timestamp: .+, UAA: " + baseUrl;
         assertTrue(webDriver.findElement(By.cssSelector(".footer .copyright")).getAttribute("title").matches(regex));
     }
+
+    @Test
+    public void testLoginReloadRetainsFormRedirect() {
+
+        String redirectUri = "http://expected.com";
+        webDriver.get(baseUrl + "/oauth/authorize?client_id=test&redirect_uri="+redirectUri);
+        ((JavascriptExecutor)webDriver).executeScript("document.getElementsByName('X-Uaa-Csrf')[0].value=''");
+        webDriver.manage().deleteCookieNamed("JSESSIONID");
+
+        webDriver.findElement(By.xpath("//input[@value='Sign in']")).click();
+
+        assertThat(webDriver.getCurrentUrl(), Matchers.containsString("/login"));
+        assertThat(webDriver.findElement(By.name("form_redirect_uri")).getAttribute("value"), Matchers.containsString("redirect_uri="+redirectUri));
+
+}
 
     private String createAnotherUser() {
         String userEmail = "user" + new SecureRandom().nextInt() + "@example.com";

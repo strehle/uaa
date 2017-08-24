@@ -208,6 +208,15 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
     }
 
     @Test
+    public void invalid_accept_media_type() throws Exception {
+        getMockMvc().perform(
+            get("/login")
+                .header("Accept", MediaType.TEXT_XML_VALUE)
+        )
+            .andExpect(status().isNotAcceptable());
+    }
+
+    @Test
     public void testLogin() throws Exception {
         getMockMvc().perform(get("/login"))
             .andExpect(status().isOk())
@@ -345,6 +354,17 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         assertNotEquals(csrf1.getValue(), csrf2.getValue());
     }
 
+    @Test
+    public void testLoginPageReloadOnCsrfExpiry() throws Exception {
+        CookieBasedCsrfTokenRepository cookieBasedCsrfTokenRepository = webApplicationContext.getBean(CookieBasedCsrfTokenRepository.class);
+        cookieBasedCsrfTokenRepository.setCookieMaxAge(3);
+
+        MvcResult mvcResult = getMockMvc()
+                .perform(get("/login"))
+                .andReturn();
+        assertThat("", mvcResult.getResponse().getContentAsString(), containsString("http-equiv=\"refresh\" content=\"3\""));
+    }
+
     protected void setDisableInternalAuth(boolean disable) throws Exception {
        MockMvcUtils.setDisableInternalAuth(getWebApplicationContext(), getUaa().getId(), disable);
     }
@@ -405,7 +425,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
             .andExpect(status().isForbidden())
             .andExpect(forwardedUrl("/login?error=invalid_login_request"));
 
-        ScimUser marissa = getWebApplicationContext().getBean(JdbcScimUserProvisioning.class).query("username eq 'marissa'").get(0);
+        ScimUser marissa = getWebApplicationContext().getBean(JdbcScimUserProvisioning.class).query("username eq 'marissa'", IdentityZoneHolder.get().getId()).get(0);
 
         MockHttpServletRequestBuilder validPost = post("/uaa/login.do")
             .session(session)
@@ -645,7 +665,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
     public void testForgotPasswordSubmitDoesNotValidateCsrf() throws Exception {
         getMockMvc().perform(
             post("/forgot_password.do")
-                .param("email", "marissa@test.org")
+                .param("username", "marissa")
                 .with(csrf().useInvalidToken()))
             .andExpect(status().isFound())
             .andExpect(redirectedUrl("email_sent?code=reset_password"));
@@ -1001,7 +1021,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
     @Test
     public void testAccessConfirmationPage() throws Exception {
         ScimUserProvisioning userProvisioning = getWebApplicationContext().getBean(JdbcScimUserProvisioning.class);
-        ScimUser marissa = userProvisioning.query("username eq \"marissa\" and origin eq \"uaa\"").get(0);
+        ScimUser marissa = userProvisioning.query("username eq \"marissa\" and origin eq \"uaa\"", IdentityZoneHolder.get().getId()).get(0);
         UaaPrincipal uaaPrincipal = new UaaPrincipal(marissa.getId(), marissa.getUserName(), marissa.getPrimaryEmail(), marissa.getOrigin(), marissa.getExternalId(), IdentityZoneHolder.get().getId());
 
         UsernamePasswordAuthenticationToken principal = new UsernamePasswordAuthenticationToken(uaaPrincipal, null, asList(UaaAuthority.fromAuthorities("uaa.user")));
@@ -2077,7 +2097,8 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
                 .andExpect(content().string(containsString("Sign in")))
                 .andExpect(xpath("//input[@name='email']").exists())
                 .andExpect(xpath("//div[@class='action']//a").string("Create account"))
-                .andExpect(xpath("//input[@type='submit']/@value").string("Next"));
+                .andExpect(xpath("//input[@name='skipDiscovery']/@value").string("Skip Discovery"))
+                .andExpect(xpath("//input[@name='commit']/@value").string("Next"));
     }
 
     @Test
@@ -2106,7 +2127,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         BaseClientDetails client = new BaseClientDetails(clientId, "", "", "client_credentials", "uaa.none", "http://*.wildcard.testing,http://testing.com");
         client.setClientSecret("secret");
         client.addAdditionalInformation(ClientConstants.CLIENT_NAME, clientName);
-        MockMvcUtils.createClient(getMockMvc(), adminToken, client, zone);
+        MockMvcUtils.createClient(getMockMvc(), adminToken, client, zone, status().isCreated());
 
         SavedRequest savedRequest = getSavedRequest(client);
         session.setAttribute(SAVED_REQUEST_SESSION_ATTRIBUTE, savedRequest);
@@ -2120,7 +2141,8 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
             .andExpect(content().string(containsString("Sign in to continue to "+clientName)))
             .andExpect(xpath("//input[@name='email']").exists())
             .andExpect(xpath("//div[@class='action']//a").string("Create account"))
-            .andExpect(xpath("//input[@type='submit']/@value").string("Next"));
+            .andExpect(xpath("//input[@name='skipDiscovery']/@value").string("Skip Discovery"))
+            .andExpect(xpath("//input[@name='commit']/@value").string("Next"));
     }
 
     @Test
@@ -2136,7 +2158,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         BaseClientDetails client = new BaseClientDetails(clientId, "", "", "client_credentials", "uaa.none", "http://*.wildcard.testing,http://testing.com");
         client.setClientSecret("secret");
         client.addAdditionalInformation(ClientConstants.CLIENT_NAME, clientName);
-        MockMvcUtils.createClient(getMockMvc(), adminToken, client, zone);
+        MockMvcUtils.createClient(getMockMvc(), adminToken, client, zone, status().isCreated());
 
         SavedAccountOption savedAccount = new SavedAccountOption();
         savedAccount.setEmail("test@example.org");
@@ -2164,7 +2186,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         BaseClientDetails client = new BaseClientDetails(clientId, "", "", "client_credentials", "uaa.none", "http://*.wildcard.testing,http://testing.com");
         client.setClientSecret("secret");
         client.addAdditionalInformation(ClientConstants.CLIENT_NAME, clientName);
-        MockMvcUtils.createClient(getMockMvc(), adminToken, client, zone);
+        MockMvcUtils.createClient(getMockMvc(), adminToken, client, zone, status().isCreated());
 
         SavedAccountOption savedAccount = new SavedAccountOption();
         savedAccount.setEmail("test@example.org");
@@ -2293,7 +2315,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
             .session(session)
             .param("email", "marissa@other.domain")
             .with(new SetServerNameRequestPostProcessor(zone.getSubdomain() + ".localhost")))
-            .andExpect(redirectedUrl("/login?discoveryPerformed=true"));
+            .andExpect(redirectedUrl("/login?discoveryPerformed=true&providedUsername=marissa%40other.domain"));
     }
 
     @Test
@@ -2316,7 +2338,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
             .session(session)
             .param("email", "marissa@test.org")
             .with(new SetServerNameRequestPostProcessor(zone.getSubdomain() + ".localhost")))
-            .andExpect(redirectedUrl("/login?discoveryPerformed=true"));
+            .andExpect(redirectedUrl("/login?discoveryPerformed=true&providedUsername=marissa%40test.org"));
     }
 
     @Test
@@ -2357,7 +2379,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
             .session(session)
             .param("email", "marissa@testLdap.org")
             .with(new SetServerNameRequestPostProcessor(zone.getSubdomain() + ".localhost")))
-            .andExpect(redirectedUrl("/login?discoveryPerformed=true"));
+            .andExpect(redirectedUrl("/login?discoveryPerformed=true&providedUsername=marissa%40testLdap.org"));
     }
 
     @Test
@@ -2431,7 +2453,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         HashSet<String> registeredRedirectUris = new HashSet<>();
         registeredRedirectUris.add("http://idp-not-allowed.localhost/");
         client.setRegisteredRedirectUri(registeredRedirectUris);
-        MockMvcUtils.createClient(getMockMvc(), adminToken, client, zone);
+        MockMvcUtils.createClient(getMockMvc(), adminToken, client, zone, status().isCreated());
 
         MockHttpServletRequestBuilder authorize = get("/oauth/authorize")
           .with(inZone)
@@ -2473,7 +2495,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         client.setClientSecret("secret");
         client.addAdditionalInformation(ClientConstants.CLIENT_NAME, "woohoo");
         client.addAdditionalInformation(ClientConstants.ALLOWED_PROVIDERS, asList(originKey, "other-provider", UAA, LDAP));
-        MockMvcUtils.createClient(getMockMvc(), adminToken, client, zone);
+        MockMvcUtils.createClient(getMockMvc(), adminToken, client, zone, status().isCreated());
 
         SavedRequest savedRequest = getSavedRequest(client);
         MockHttpSession session = new MockHttpSession();

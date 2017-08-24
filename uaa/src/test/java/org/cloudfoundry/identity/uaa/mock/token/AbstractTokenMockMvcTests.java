@@ -34,6 +34,7 @@ import org.cloudfoundry.identity.uaa.zone.ClientServicesExtension;
 import org.cloudfoundry.identity.uaa.zone.IdentityZone;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneProvisioning;
+import org.cloudfoundry.identity.uaa.zone.UserConfig;
 import org.junit.Before;
 import org.springframework.security.oauth2.common.util.RandomValueStringGenerator;
 import org.springframework.security.oauth2.provider.client.BaseClientDetails;
@@ -43,6 +44,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -108,12 +110,20 @@ public abstract class AbstractTokenMockMvcTests extends InjectedMockContextTest 
     }
 
     protected IdentityZone setupIdentityZone(String subdomain) {
+        return setupIdentityZone(subdomain, UserConfig.DEFAULT_ZONE_GROUPS);
+    }
+
+    protected IdentityZone setupIdentityZone(String subdomain, List<String> defaultUserGroups) {
         IdentityZone zone = new IdentityZone();
+        zone.getConfig().getUserConfig().setDefaultGroups(defaultUserGroups);
         zone.getConfig().getTokenPolicy().setKeys(Collections.singletonMap(subdomain+"_key", "key_for_"+subdomain));
         zone.setId(UUID.randomUUID().toString());
         zone.setName(subdomain);
         zone.setSubdomain(subdomain);
         zone.setDescription(subdomain);
+        List<String> defaultGroups = new LinkedList(zone.getConfig().getUserConfig().getDefaultGroups());
+        defaultGroups.add("cloud_controller.read");
+        zone.getConfig().getUserConfig().setDefaultGroups(defaultGroups);
         identityZoneProvisioning.create(zone);
         return zone;
     }
@@ -195,7 +205,7 @@ public abstract class AbstractTokenMockMvcTests extends InjectedMockContextTest 
             user.setOrigin(origin);
 
 
-            user = userProvisioning.createUser(user, SECRET);
+            user = userProvisioning.createUser(user, SECRET, IdentityZoneHolder.get().getId());
 
             Set<String> scopeSet = StringUtils.commaDelimitedListToSet(scopes);
             Set<ScimGroup> groups = new HashSet<>();
@@ -241,7 +251,7 @@ public abstract class AbstractTokenMockMvcTests extends InjectedMockContextTest 
     }
 
     protected ScimGroup createIfNotExist(String scope, String zoneId) {
-        List<ScimGroup> exists = groupProvisioning.query("displayName eq \"" + scope + "\" and identity_zone_id eq \""+zoneId+"\"");
+        List<ScimGroup> exists = groupProvisioning.query("displayName eq \"" + scope + "\" and identity_zone_id eq \""+zoneId+"\"", IdentityZoneHolder.get().getId());
         if (exists.size() > 0) {
             return exists.get(0);
         } else {

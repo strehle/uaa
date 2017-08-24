@@ -20,6 +20,7 @@ import org.cloudfoundry.identity.uaa.security.DefaultSecurityContextAccessor;
 import org.cloudfoundry.identity.uaa.security.SecurityContextAccessor;
 import org.cloudfoundry.identity.uaa.util.UaaUrlUtils;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
+import org.cloudfoundry.identity.uaa.zone.ClientSecretValidator;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.oauth2.provider.ClientDetails;
@@ -60,6 +61,7 @@ public class ClientAdminEndpointsValidator implements InitializingBean, ClientDe
 
     private static final Collection<String> NON_ADMIN_VALID_AUTHORITIES = new HashSet<>(Arrays.asList("uaa.none"));
 
+    private ClientSecretValidator clientSecretValidator;
 
     private QueryableResourceManager<ClientDetails> clientDetailsService;
 
@@ -86,8 +88,8 @@ public class ClientAdminEndpointsValidator implements InitializingBean, ClientDe
     }
 
     /* (non-Javadoc)
-     * @see org.cloudfoundry.identity.uaa.oauth.ClientDetailsValidatorInterface#validate(org.springframework.security.oauth2.provider.ClientDetails, boolean)
-     */
+         * @see org.cloudfoundry.identity.uaa.oauth.ClientDetailsValidatorInterface#validate(org.springframework.security.oauth2.provider.ClientDetails, boolean)
+         */
     @Override
     public ClientDetails validate(ClientDetails prototype, Mode mode) {
         return validate(prototype, mode == Mode.CREATE, true);
@@ -127,11 +129,11 @@ public class ClientAdminEndpointsValidator implements InitializingBean, ClientDe
 
         if(requestedGrantTypes.contains(GRANT_TYPE_JWT_BEARER)) {
             if(client.getScope() == null || client.getScope().isEmpty()) {
-                logger.debug("Invalid client: " + clientId +". Scope cannot be empty for grant_type " + GRANT_TYPE_JWT_BEARER);
+                logger.debug("Invalid client: " + clientId + ". Scope cannot be empty for grant_type " + GRANT_TYPE_JWT_BEARER);
                 throw new InvalidClientDetailsException("Scope cannot be empty for grant_type " + GRANT_TYPE_JWT_BEARER);
             }
-            if(!StringUtils.hasText(client.getClientSecret())) {
-                logger.debug("Invalid client: " + clientId +". Scope cannot be empty for grant_type " + GRANT_TYPE_JWT_BEARER);
+            if(create && !StringUtils.hasText(client.getClientSecret())) {
+                logger.debug("Invalid client: " + clientId + ". Client secret is required for grant type " + GRANT_TYPE_JWT_BEARER);
                 throw new InvalidClientDetailsException("Client secret is required for grant type " + GRANT_TYPE_JWT_BEARER);
             }
         }
@@ -231,11 +233,13 @@ public class ClientAdminEndpointsValidator implements InitializingBean, ClientDe
         }
         if (create) {
             // Only check for missing secret if client is being created.
-            if ((requestedGrantTypes.contains("client_credentials") || requestedGrantTypes
-                            .contains("authorization_code"))
-                            && !StringUtils.hasText(client.getClientSecret())) {
-                throw new InvalidClientDetailsException(
-                                "Client secret is required for client_credentials and authorization_code grant types");
+            if (requestedGrantTypes.contains("client_credentials") || requestedGrantTypes
+                            .contains("authorization_code")) {
+                if(!StringUtils.hasText(client.getClientSecret())) {
+                    throw new InvalidClientDetailsException(
+                            "Client secret is required for client_credentials and authorization_code grant types");
+                }
+                clientSecretValidator.validate(client.getClientSecret());
             }
         }
 
@@ -274,5 +278,14 @@ public class ClientAdminEndpointsValidator implements InitializingBean, ClientDe
                                 + VALID_GRANTS.toString());
             }
         }
+    }
+
+    @Override
+    public ClientSecretValidator getClientSecretValidator() {
+        return this.clientSecretValidator;
+    }
+
+    public void setClientSecretValidator(ClientSecretValidator clientSecretValidator) {
+        this.clientSecretValidator = clientSecretValidator;
     }
 }

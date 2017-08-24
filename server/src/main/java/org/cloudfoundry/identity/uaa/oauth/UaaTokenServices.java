@@ -45,6 +45,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.ApplicationEventPublisherAware;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
@@ -152,8 +153,6 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
     private ClientServicesExtension clientDetailsService = null;
 
     private String issuer = null;
-
-    private Set<String> defaultUserAuthorities = new HashSet<String>();
 
     private ApprovalStore approvalStore = null;
 
@@ -453,7 +452,7 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
         } catch (JsonUtils.JsonUtilException e) {
             throw new IllegalStateException("Cannot convert access token to JSON", e);
         }
-        String token = JwtHelper.encode(content, KeyInfo.getActiveKey().getSigner()).getEncoded();
+        String token = JwtHelper.encode(content, getActiveKeyInfo().getSigner()).getEncoded();
         // This setter copies the value and returns. Don't change.
         accessToken.setValue(token);
         populateIdToken(accessToken,
@@ -470,6 +469,11 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
         publish(new TokenIssuedEvent(accessToken, SecurityContextHolder.getContext().getAuthentication()));
 
         return accessToken;
+    }
+
+    private KeyInfo getActiveKeyInfo() {
+        return ofNullable(KeyInfo.getActiveKey())
+            .orElseThrow(() -> new InternalAuthenticationServiceException("Unable to sign token, misconfigured JWT signing keys"));
     }
 
     private void populateIdToken(CompositeAccessToken token,
@@ -654,7 +658,7 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
         OAuth2RefreshToken refreshToken = null;
 
         if(client.getAuthorizedGrantTypes().contains(GRANT_TYPE_REFRESH_TOKEN)){
-            refreshToken = createRefreshToken(refreshTokenId, authentication, revocableHashSignature, refreshTokenRevocable);
+            refreshToken = createRefreshToken(user, refreshTokenId, authentication, revocableHashSignature, refreshTokenRevocable);
         }
 
         String clientId = authentication.getOAuth2Request().getClientId();
@@ -848,7 +852,7 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
         return null;
     }
 
-    private ExpiringOAuth2RefreshToken createRefreshToken(String tokenId,
+    private ExpiringOAuth2RefreshToken createRefreshToken(UaaUser user, String tokenId,
                                                           OAuth2Authentication authentication,
                                                           String revocableHashSignature,
                                                           boolean revocable) {
@@ -865,10 +869,6 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
         int validitySeconds = getRefreshTokenValiditySeconds(authentication.getOAuth2Request());
         ExpiringOAuth2RefreshToken token = new DefaultExpiringOAuth2RefreshToken(tokenId,
                                                                                  new Date(System.currentTimeMillis() + (validitySeconds * 1000L)));
-
-        String userId = getUserId(authentication);
-
-        UaaUser user = userDatabase.retrieveUserById(userId);
 
         Map<String,String> externalAttributes = null;
         if (uaaTokenEnhancer != null) {
@@ -894,7 +894,7 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
         } catch (JsonUtils.JsonUtilException e) {
             throw new IllegalStateException("Cannot convert access token to JSON", e);
         }
-        String jwtToken = JwtHelper.encode(content, KeyInfo.getActiveKey().getSigner()).getEncoded();
+        String jwtToken = JwtHelper.encode(content, getActiveKeyInfo().getSigner()).getEncoded();
 
         ExpiringOAuth2RefreshToken refreshToken = new DefaultExpiringOAuth2RefreshToken(jwtToken, token.getExpiration());
 
@@ -1048,14 +1048,16 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
 
         ArrayList<String> rids = (ArrayList<String>) claims.get(AUD);
         //TODO - Fix null resource IDs for a client_credentials request to /oauth/token
-        Set<String> resourceIds = Collections.unmodifiableSet(rids==null?new HashSet<String>():new HashSet<>(rids));
+        Set<String> resourceIds = Collections.unmodifiableSet(rids==null?new HashSet<>():new HashSet<>(rids));
         authorizationRequest.setResourceIds(resourceIds);
 
         authorizationRequest.setApproved(true);
 
-        Collection<? extends GrantedAuthority> authorities = AuthorityUtils
-                        .commaSeparatedStringToAuthorityList(StringUtils
-                            .collectionToCommaDelimitedString(defaultUserAuthorities));
+        Collection<String> defaultUserAuthorities = IdentityZoneHolder.get().getConfig().getUserConfig().getDefaultGroups();
+        Collection<? extends GrantedAuthority> authorities =
+            AuthorityUtils.commaSeparatedStringToAuthorityList(
+                StringUtils.collectionToCommaDelimitedString(defaultUserAuthorities)
+            );
         if (claims.containsKey("authorities")) {
             Object authoritiesFromClaims = claims.get("authorities");
             if (authoritiesFromClaims instanceof String) {
@@ -1241,10 +1243,6 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
 
     public void setClientDetailsService(ClientServicesExtension clientDetailsService) {
         this.clientDetailsService = clientDetailsService;
-    }
-
-    public void setDefaultUserAuthorities(Set<String> defaultUserAuthorities) {
-        this.defaultUserAuthorities = defaultUserAuthorities;
     }
 
     public void setApprovalStore(ApprovalStore approvalStore) {

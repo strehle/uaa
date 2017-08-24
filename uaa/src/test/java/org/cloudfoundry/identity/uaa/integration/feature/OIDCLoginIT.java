@@ -18,7 +18,6 @@ import org.cloudfoundry.identity.uaa.account.UserInfoResponse;
 import org.cloudfoundry.identity.uaa.constants.OriginKeys;
 import org.cloudfoundry.identity.uaa.integration.util.IntegrationTestUtils;
 import org.cloudfoundry.identity.uaa.integration.util.ScreenshotOnFail;
-import org.cloudfoundry.identity.uaa.login.test.LoginServerClassRunner;
 import org.cloudfoundry.identity.uaa.oauth.jwt.Jwt;
 import org.cloudfoundry.identity.uaa.oauth.jwt.JwtHelper;
 import org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants;
@@ -49,6 +48,7 @@ import org.springframework.security.oauth2.client.test.TestAccounts;
 import org.springframework.security.oauth2.common.util.RandomValueStringGenerator;
 import org.springframework.security.oauth2.provider.client.BaseClientDetails;
 import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.web.client.RestOperations;
 import org.springframework.web.client.RestTemplate;
 
@@ -72,9 +72,10 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
-@RunWith(LoginServerClassRunner.class)
+@RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(classes = DefaultIntegrationTestConfig.class)
 public class OIDCLoginIT {
 
@@ -102,13 +103,11 @@ public class OIDCLoginIT {
     @Autowired
     TestClient testClient;
 
-    ServerRunning serverRunning = ServerRunning.isRunning();
+    private ServerRunning serverRunning = ServerRunning.isRunning();
 
-    private String originKey = null;
     private IdentityZone zone;
     private String adminToken;
     private String subdomain;
-    private String zoneHost;
     private String zoneUrl;
     private IdentityProvider<AbstractXOAuthIdentityProviderDefinition> identityProvider;
     private String clientCredentialsToken;
@@ -131,16 +130,17 @@ public class OIDCLoginIT {
         zone = IntegrationTestUtils.createZoneOrUpdateSubdomain(identityClient, baseUrl, subdomain, subdomain, zoneConfiguration);
         adminToken = IntegrationTestUtils.getClientCredentialsToken(baseUrl, "admin", "adminsecret");
 
-        zoneHost = zone.getSubdomain()+".localhost";
-        zoneUrl = "http://"+ zoneHost + ":8080/uaa";
-
+        String zoneHost = zone.getSubdomain() + ".localhost";
+        zoneUrl = "http://" + zoneHost + ":8080/uaa";
 
         String urlBase = "http://localhost:8080/uaa";
         identityProvider = new IdentityProvider<>();
         identityProvider.setName("my oidc provider");
         identityProvider.setIdentityZoneId(OriginKeys.UAA);
         OIDCIdentityProviderDefinition config = new OIDCIdentityProviderDefinition();
+        config.setClientAuthInBody(false);
         config.addAttributeMapping(USER_NAME_ATTRIBUTE_NAME, "user_name");
+        config.addAttributeMapping("given_name", "user_name");
         config.addAttributeMapping("user.attribute." + "the_client_id", "cid");
         config.setStoreCustomAttributes(true);
 
@@ -164,7 +164,6 @@ public class OIDCLoginIT {
         identityProvider.setIdentityZoneId(zone.getId());
         clientCredentialsToken = IntegrationTestUtils.getClientCredentialsToken(baseUrl, "admin", "adminsecret");
         updateProvider();
-        originKey = "puppy";
 
         zoneClient = new BaseClientDetails(new RandomValueStringGenerator().generate(), null, "openid,user_attributes", "authorization_code,client_credentials", "uaa.admin,scim.read,scim.write,uaa.resource", zoneUrl);
         zoneClient.setClientSecret("secret");
@@ -237,6 +236,16 @@ public class OIDCLoginIT {
         String zoneAdminToken = IntegrationTestUtils.getClientCredentialsToken(serverRunning, "admin", "adminsecret");
         ScimUser user = IntegrationTestUtils.getUserByZone(zoneAdminToken, baseUrl, subdomain, testAccounts.getUserName());
         IntegrationTestUtils.validateUserLastLogon(user, beforeTest, afterTest);
+        assertEquals(user.getGivenName(), user.getUserName());
+    }
+
+    @Test
+    public void successfulLoginWithOIDCProviderAndClientAuthInBody() throws Exception {
+        identityProvider.getConfig().setClientAuthInBody(true);
+        assertTrue(identityProvider.getConfig().isClientAuthInBody());
+        updateProvider();
+        assertTrue(identityProvider.getConfig().isClientAuthInBody());
+        validateSuccessfulOIDCLogin(zoneUrl, testAccounts.getUserName(), testAccounts.getPassword());
     }
 
     @Test

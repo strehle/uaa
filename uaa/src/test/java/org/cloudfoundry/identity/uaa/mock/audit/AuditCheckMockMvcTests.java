@@ -527,8 +527,8 @@ public class AuditCheckMockMvcTests extends InjectedMockContextTest {
         ScimUserProvisioning provisioning = getWebApplicationContext().getBean(ScimUserProvisioning.class);
         ScimUser user = new ScimUser(null, new RandomValueStringGenerator().generate()+"@test.org", "first","last");
         user.setPrimaryEmail(user.getUserName());
-        user = provisioning.createUser(user, "oldpassword");
-        provisioning.changePassword(user.getId(), "oldpassword", "newpassword");
+        user = provisioning.createUser(user, "oldpassword", IdentityZoneHolder.get().getId());
+        provisioning.changePassword(user.getId(), "oldpassword", "newpassword", IdentityZoneHolder.get().getId());
         ArgumentCaptor<AbstractUaaEvent> captor  = ArgumentCaptor.forClass(AbstractUaaEvent.class);
         verify(listener, times(2)).onApplicationEvent(captor.capture());
         //the last event should be our password modified event
@@ -847,7 +847,7 @@ public class AuditCheckMockMvcTests extends InjectedMockContextTest {
         assertEquals(ResetPasswordRequestEvent.class, testListener.getLatestEvent().getClass());
         ResetPasswordRequestEvent event = (ResetPasswordRequestEvent) testListener.getLatestEvent();
         assertEquals(testUser.getUserName(), event.getAuditEvent().getPrincipalId());
-        assertEquals(null, event.getAuditEvent().getData());
+        assertEquals(testUser.getPrimaryEmail(), event.getAuditEvent().getData());
     }
 
     @Test
@@ -865,18 +865,15 @@ public class AuditCheckMockMvcTests extends InjectedMockContextTest {
         ScimGroup group = new ScimGroup(null,"testgroup",IdentityZoneHolder.get().getId());
         ScimGroupMember mjacob = new ScimGroupMember(
             jacob.getId(),
-            ScimGroupMember.Type.USER,
-            Arrays.asList(new ScimGroupMember.Role[]{ScimGroupMember.Role.MEMBER}));
+            ScimGroupMember.Type.USER);
 
         ScimGroupMember memily = new ScimGroupMember(
             emily.getId(),
-            ScimGroupMember.Type.USER,
-            Arrays.asList(new ScimGroupMember.Role[] {ScimGroupMember.Role.MEMBER}));
+            ScimGroupMember.Type.USER);
 
         ScimGroupMember mjonas = new ScimGroupMember(
             jonas.getId(),
-            ScimGroupMember.Type.USER,
-            Arrays.asList(new ScimGroupMember.Role[] {ScimGroupMember.Role.MEMBER}));
+            ScimGroupMember.Type.USER);
 
         group.setMembers(Arrays.asList(new ScimGroupMember[] {mjacob, memily}));
 
