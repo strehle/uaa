@@ -54,8 +54,7 @@
     <dependency>
       <groupId>org.apache.tomcat</groupId>
       <artifactId>tomcat-jdbc</artifactId>
-      <version>8.0.41</version>
-      <scope>test</scope>
+      <version>8.5.16</version>
     </dependency>
     <dependency>
       <groupId>org.flywaydb</groupId>
@@ -120,7 +119,7 @@
     <dependency>
       <groupId>org.springframework.security</groupId>
       <artifactId>spring-security-web</artifactId>
-      <version>4.2.1.RELEASE</version>
+      <version>4.2.3.RELEASE</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
@@ -182,7 +181,7 @@
     <dependency>
       <groupId>org.springframework.security</groupId>
       <artifactId>spring-security-jwt</artifactId>
-      <version>1.0.4.RELEASE</version>
+      <version>1.0.8.RELEASE</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
@@ -206,7 +205,7 @@
     <dependency>
       <groupId>nz.net.ultraq.thymeleaf</groupId>
       <artifactId>thymeleaf-layout-dialect</artifactId>
-      <version>2.2.0</version>
+      <version>2.2.2</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
@@ -218,7 +217,7 @@
     <dependency>
       <groupId>org.springframework.security</groupId>
       <artifactId>spring-security-core</artifactId>
-      <version>4.2.1.RELEASE</version>
+      <version>4.2.3.RELEASE</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
@@ -230,7 +229,7 @@
     <dependency>
       <groupId>org.hibernate</groupId>
       <artifactId>hibernate-validator</artifactId>
-      <version>4.3.1.Final</version>
+      <version>4.3.2.Final</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
@@ -278,7 +277,7 @@
     <dependency>
       <groupId>org.springframework.security</groupId>
       <artifactId>spring-security-ldap</artifactId>
-      <version>4.2.1.RELEASE</version>
+      <version>4.2.3.RELEASE</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
@@ -330,19 +329,19 @@
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>
-      <artifactId>mockito-all</artifactId>
-      <version>1.10.19</version>
+      <artifactId>mockito-core</artifactId>
+      <version>2.7.19</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <artifactId>bcprov-jdk15on</artifactId>
       <groupId>org.bouncycastle</groupId>
-      <version>1.56</version>
+      <version>1.57</version>
     </dependency>
     <dependency>
       <artifactId>bcpkix-jdk15on</artifactId>
       <groupId>org.bouncycastle</groupId>
-      <version>1.56</version>
+      <version>1.57</version>
     </dependency>
   </dependencies>
 </project>
