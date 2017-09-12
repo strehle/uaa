@@ -3,6 +3,7 @@ package org.cloudfoundry.identity.uaa.mock.zones;
 import org.cloudfoundry.identity.uaa.mock.InjectedMockContextTest;
 import org.cloudfoundry.identity.uaa.util.JsonUtils;
 import org.cloudfoundry.identity.uaa.zone.BrandingInformation;
+import org.cloudfoundry.identity.uaa.zone.BrandingInformation.Banner;
 import org.cloudfoundry.identity.uaa.zone.IdentityZone;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneConfiguration;
 import org.cloudfoundry.identity.uaa.zone.SamlConfig;
@@ -65,6 +66,7 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
     private static final String WANT_ASSERTION_SIGNED_DESC = "Exposed SAML metadata property. If `true`, all assertions received by the SAML provider must be signed. Defaults to `true`.";
     private static final String REQUEST_SIGNED_DESC = "Exposed SAML metadata property. If `true`, the service provider will sign all outgoing authentication requests. Defaults to `true`.";
     private static final String WANT_AUTHN_REQUEST_SIGNED_DESC = "If `true`, the authentication request from the partner service provider must be signed.";
+    private static final String SAML_DISABLE_IN_RESPONSE_TO_DESC = "If `true`, this zone will not validate the `InResponseToField` part of an incoming IDP assertion. Please see https://docs.spring.io/spring-security-saml/docs/current/reference/html/chapter-troubleshooting.html";
     private static final String ASSERTION_TIME_TO_LIVE_SECONDS_DESC = "The lifetime of a SAML assertion in seconds. Defaults to 600.";
     private static final String CERTIFICATE_DESC = "Exposed SAML metadata property. The certificate used to verify the authenticity all communications.";
     private static final String PRIVATE_KEY_DESC = "Exposed SAML metadata property. The SAML provider's private key.";
@@ -88,6 +90,13 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
     private static final String BRANDING_SQUARE_LOGO_DESC = "This is a base64 encoded PNG image which will be used as the favicon for the UAA pages";
     private static final String BRANDING_FOOTER_LEGAL_TEXT_DESC = "This text appears on the footer of all UAA pages";
     private static final String BRANDING_FOOTER_LINKS_DESC = "These links (Map<String,String>) appear on the footer of all UAA pages. You may choose to add multiple urls for things like Support, Terms of Service etc.";
+
+    private static final String BRANDING_BANNER_TEXT_DESC = "This is text displayed in a banner at the top of the UAA login page";
+    private static final String BRANDING_BANNER_LOGO_DESC = "This is base64 encoded PNG data displayed in a banner at the top of the UAA login page, overrides banner text";
+    private static final String BRANDING_BANNER_LINK_DESC = "The UAA login banner will be a link pointing to this url";
+    private static final String BRANDING_BANNER_TEXT_COLOR_DESC = "Hexadecimal color code for banner text color, does not allow color names";
+    private static final String BRANDING_BANNER_BACKGROUND_COLOR_DESC = "Hexadecimal color code for banner background color, does not allow color names";
+
 
     private static final String CORS_XHR_ORIGINS_DESC = "`Access-Control-Allow-Origin header`. Indicates whether a resource can be shared based by returning the value of the Origin request header, \"*\", or \"null\" in the response.";
     private static final String CORS_XHR_ORIGIN_PATTERNS_DESC = "Indicates whether a resource can be shared based by returning the value of the Origin patterns.";
@@ -180,7 +189,6 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
             fieldWithPath("config.clientSecretPolicy.requireLowerCaseCharacter").type(NUMBER).description(SECRET_POLICY_LOWERCASE).attributes(key("constraints").value("Required when `clientSecretPolicy` in the config is not null")),
             fieldWithPath("config.clientSecretPolicy.requireDigit").type(NUMBER).description(SECRET_POLICY_DIGIT).attributes(key("constraints").value("Required when `clientSecretPolicy` in the config is not null")),
             fieldWithPath("config.clientSecretPolicy.requireSpecialCharacter").type(NUMBER).description(SECRET_POLICY_SPECIAL_CHAR).attributes(key("constraints").value("Required when `clientSecretPolicy` in the config is not null")),
-            fieldWithPath("config.clientSecretPolicy.expireSecretInMonths").type(NUMBER).description(SECRET_POLICY_EXPIRE_MONTHS).attributes(key("constraints").value("Required when `clientSecretPolicy` in the config is not null")),
 
             fieldWithPath("config.tokenPolicy").description(TOKEN_POLICY_DESC).attributes(key("constraints").value("Optional")),
             fieldWithPath("config.tokenPolicy.activeKeyId").optional().type(STRING).description(ACTIVE_KEY_ID_DESC).attributes(key("constraints").value("Required if `config.tokenPolicy.keys` are set")),
@@ -191,6 +199,7 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
             fieldWithPath("config.tokenPolicy.refreshTokenUnique").type(BOOLEAN).description(REFRESH_TOKEN_UNIQUE).attributes(key("constraints").value("Optional")),
             fieldWithPath("config.tokenPolicy.refreshTokenFormat").type(STRING).description(REFRESH_TOKEN_FORMAT).attributes(key("constraints").value("Optional")),
 
+            fieldWithPath("config.samlConfig.disableInResponseToCheck").description(SAML_DISABLE_IN_RESPONSE_TO_DESC).attributes(key("constraints").value("Optional")),
             fieldWithPath("config.samlConfig.assertionSigned").description(ASSERTION_SIGNED_DESC).attributes(key("constraints").value("Optional")),
             fieldWithPath("config.samlConfig.wantAssertionSigned").description(WANT_ASSERTION_SIGNED_DESC).attributes(key("constraints").value("Optional")),
             fieldWithPath("config.samlConfig.requestSigned").description(REQUEST_SIGNED_DESC).attributes(key("constraints").value("Optional")),
@@ -228,6 +237,12 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
             fieldWithPath("config.branding.squareLogo").description(BRANDING_SQUARE_LOGO_DESC).attributes(key("constraints").value("Optional")),
             fieldWithPath("config.branding.footerLegalText").description(BRANDING_FOOTER_LEGAL_TEXT_DESC).attributes(key("constraints").value("Optional")),
             fieldWithPath("config.branding.footerLinks.*").description(BRANDING_FOOTER_LINKS_DESC).attributes(key("constraints").value("Optional")),
+
+            fieldWithPath("config.branding.banner.text").description(BRANDING_BANNER_TEXT_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.branding.banner.logo").description(BRANDING_BANNER_LOGO_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.branding.banner.link").description(BRANDING_BANNER_LINK_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.branding.banner.textColor").description(BRANDING_BANNER_TEXT_COLOR_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.branding.banner.backgroundColor").description(BRANDING_BANNER_BACKGROUND_COLOR_DESC).attributes(key("constraints").value("Optional")),
 
             fieldWithPath("config.corsPolicy.xhrConfiguration.allowedOrigins").description(CORS_XHR_ORIGINS_DESC).attributes(key("constraints").value("Optional")),
             fieldWithPath("config.corsPolicy.xhrConfiguration.allowedOriginPatterns").description(CORS_XHR_ORIGIN_PATTERNS_DESC).attributes(key("constraints").value("Optional")),
@@ -329,8 +344,8 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
             fieldWithPath("[].config.clientSecretPolicy.requireLowerCaseCharacter").type(NUMBER).description(SECRET_POLICY_LOWERCASE).attributes(key("constraints").value("Required when `clientSecretPolicy` in the config is not null")),
             fieldWithPath("[].config.clientSecretPolicy.requireDigit").type(NUMBER).description(SECRET_POLICY_DIGIT).attributes(key("constraints").value("Required when `clientSecretPolicy` in the config is not null")),
             fieldWithPath("[].config.clientSecretPolicy.requireSpecialCharacter").type(NUMBER).description(SECRET_POLICY_SPECIAL_CHAR).attributes(key("constraints").value("Required when `clientSecretPolicy` in the config is not null")),
-            fieldWithPath("[].config.clientSecretPolicy.expireSecretInMonths").type(NUMBER).description(SECRET_POLICY_EXPIRE_MONTHS).attributes(key("constraints").value("Required when `clientSecretPolicy` in the config is not null")),
 
+            fieldWithPath("[]config.samlConfig.disableInResponseToCheck").description(SAML_DISABLE_IN_RESPONSE_TO_DESC).attributes(key("constraints").value("Optional")),
             fieldWithPath("[].config.samlConfig.assertionSigned").description(ASSERTION_SIGNED_DESC),
             fieldWithPath("[].config.samlConfig.wantAssertionSigned").description(WANT_ASSERTION_SIGNED_DESC),
             fieldWithPath("[].config.samlConfig.requestSigned").description(REQUEST_SIGNED_DESC),
@@ -373,6 +388,13 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
             fieldWithPath("[].config.branding.squareLogo").description(BRANDING_SQUARE_LOGO_DESC).attributes(key("constraints").value("Optional")),
             fieldWithPath("[].config.branding.footerLegalText").description(BRANDING_FOOTER_LEGAL_TEXT_DESC).attributes(key("constraints").value("Optional")),
             fieldWithPath("[].config.branding.footerLinks.*").description(BRANDING_FOOTER_LINKS_DESC).attributes(key("constraints").value("Optional")),
+
+            fieldWithPath("[].config.branding.banner.text").description(BRANDING_BANNER_TEXT_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("[].config.branding.banner.logo").description(BRANDING_BANNER_LOGO_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("[].config.branding.banner.link").description(BRANDING_BANNER_LINK_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("[].config.branding.banner.textColor").description(BRANDING_BANNER_TEXT_COLOR_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("[].config.branding.banner.backgroundColor").description(BRANDING_BANNER_BACKGROUND_COLOR_DESC).attributes(key("constraints").value("Optional")),
+
 
             fieldWithPath("[].config.corsPolicy.xhrConfiguration.allowedOrigins").description(CORS_XHR_ORIGINS_DESC).attributes(key("constraints").value("Optional")),
             fieldWithPath("[].config.corsPolicy.xhrConfiguration.allowedOriginPatterns").description(CORS_XHR_ORIGIN_PATTERNS_DESC).attributes(key("constraints").value("Optional")),
@@ -457,8 +479,8 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
             fieldWithPath("config.clientSecretPolicy.requireLowerCaseCharacter").type(NUMBER).description(SECRET_POLICY_LOWERCASE).attributes(key("constraints").value("Required when `clientSecretPolicy` in the config is not null")),
             fieldWithPath("config.clientSecretPolicy.requireDigit").type(NUMBER).description(SECRET_POLICY_DIGIT).attributes(key("constraints").value("Required when `clientSecretPolicy` in the config is not null")),
             fieldWithPath("config.clientSecretPolicy.requireSpecialCharacter").type(NUMBER).description(SECRET_POLICY_SPECIAL_CHAR).attributes(key("constraints").value("Required when `clientSecretPolicy` in the config is not null")),
-            fieldWithPath("config.clientSecretPolicy.expireSecretInMonths").type(NUMBER).description(SECRET_POLICY_EXPIRE_MONTHS).attributes(key("constraints").value("Required when `clientSecretPolicy` in the config is not null")),
 
+            fieldWithPath("config.samlConfig.disableInResponseToCheck").description(SAML_DISABLE_IN_RESPONSE_TO_DESC).attributes(key("constraints").value("Optional")),
             fieldWithPath("config.samlConfig.assertionSigned").description(ASSERTION_SIGNED_DESC).attributes(key("constraints").value("Optional")),
             fieldWithPath("config.samlConfig.wantAssertionSigned").description(WANT_ASSERTION_SIGNED_DESC).attributes(key("constraints").value("Optional")),
             fieldWithPath("config.samlConfig.requestSigned").description(REQUEST_SIGNED_DESC).attributes(key("constraints").value("Optional")),
@@ -496,6 +518,12 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
             fieldWithPath("config.branding.squareLogo").description(BRANDING_SQUARE_LOGO_DESC).attributes(key("constraints").value("Optional")),
             fieldWithPath("config.branding.footerLegalText").description(BRANDING_FOOTER_LEGAL_TEXT_DESC).attributes(key("constraints").value("Optional")),
             fieldWithPath("config.branding.footerLinks.*").description(BRANDING_FOOTER_LINKS_DESC).attributes(key("constraints").value("Optional")),
+
+            fieldWithPath("config.branding.banner.text").description(BRANDING_BANNER_TEXT_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.branding.banner.logo").description(BRANDING_BANNER_LOGO_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.branding.banner.link").description(BRANDING_BANNER_LINK_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.branding.banner.textColor").description(BRANDING_BANNER_TEXT_COLOR_DESC).attributes(key("constraints").value("Optional")),
+            fieldWithPath("config.branding.banner.backgroundColor").description(BRANDING_BANNER_BACKGROUND_COLOR_DESC).attributes(key("constraints").value("Optional")),
 
             fieldWithPath("config.corsPolicy.xhrConfiguration.allowedOrigins").description(CORS_XHR_ORIGINS_DESC).attributes(key("constraints").value("Optional")),
             fieldWithPath("config.corsPolicy.xhrConfiguration.allowedOriginPatterns").description(CORS_XHR_ORIGIN_PATTERNS_DESC).attributes(key("constraints").value("Optional")),
@@ -618,8 +646,8 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
             fieldWithPath("config.clientSecretPolicy.requireLowerCaseCharacter").type(NUMBER).description(SECRET_POLICY_LOWERCASE).attributes(key("constraints").value("Required when `clientSecretPolicy` in the config is not null")),
             fieldWithPath("config.clientSecretPolicy.requireDigit").type(NUMBER).description(SECRET_POLICY_DIGIT).attributes(key("constraints").value("Required when `clientSecretPolicy` in the config is not null")),
             fieldWithPath("config.clientSecretPolicy.requireSpecialCharacter").type(NUMBER).description(SECRET_POLICY_SPECIAL_CHAR).attributes(key("constraints").value("Required when `clientSecretPolicy` in the config is not null")),
-            fieldWithPath("config.clientSecretPolicy.expireSecretInMonths").type(NUMBER).description(SECRET_POLICY_EXPIRE_MONTHS).attributes(key("constraints").value("Required when `clientSecretPolicy` in the config is not null")),
 
+            fieldWithPath("config.samlConfig.disableInResponseToCheck").description(SAML_DISABLE_IN_RESPONSE_TO_DESC),
             fieldWithPath("config.samlConfig.assertionSigned").description(ASSERTION_SIGNED_DESC),
             fieldWithPath("config.samlConfig.wantAssertionSigned").description(WANT_ASSERTION_SIGNED_DESC),
             fieldWithPath("config.samlConfig.requestSigned").description(REQUEST_SIGNED_DESC),
@@ -652,6 +680,13 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
             fieldWithPath("config.branding.squareLogo").description(BRANDING_SQUARE_LOGO_DESC),
             fieldWithPath("config.branding.footerLegalText").description(BRANDING_FOOTER_LEGAL_TEXT_DESC),
             fieldWithPath("config.branding.footerLinks.*").description(BRANDING_FOOTER_LINKS_DESC),
+
+            fieldWithPath("config.branding.banner.text").description(BRANDING_BANNER_TEXT_DESC),
+            fieldWithPath("config.branding.banner.logo").description(BRANDING_BANNER_LOGO_DESC),
+            fieldWithPath("config.branding.banner.link").description(BRANDING_BANNER_LINK_DESC),
+            fieldWithPath("config.branding.banner.textColor").description(BRANDING_BANNER_TEXT_COLOR_DESC),
+            fieldWithPath("config.branding.banner.backgroundColor").description(BRANDING_BANNER_BACKGROUND_COLOR_DESC),
+
 
             fieldWithPath("config.corsPolicy.defaultConfiguration.allowedOrigins").description(CORS_XHR_ORIGINS_DESC),
             fieldWithPath("config.corsPolicy.defaultConfiguration.allowedOriginPatterns").description(CORS_XHR_ORIGIN_PATTERNS_DESC),
@@ -687,6 +722,13 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
         HashMap<String, String> footerLinks = new HashMap<>();
         footerLinks.put("Support", "http://support.example.com");
         branding.setFooterLinks(footerLinks);
+        Banner banner = new Banner();
+        banner.setText("Announcement");
+        banner.setLink("http://announce.example.com");
+        banner.setLogo("VGVzdFByb2R1Y3RMb2dv");
+        banner.setTextColor("#000000");
+        banner.setBackgroundColor("#89cff0");
+        branding.setBanner(banner);
         config.setBranding(branding);
         config.getLinks().setHomeRedirect("http://my.hosted.homepage.com/");
         return config;

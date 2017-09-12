@@ -406,6 +406,7 @@ login:
         skipSslValidation: true
     signatureAlgorithm: SHA256
     wantAssertionSigned: false
+    disableInResponseToCheck: true
     signRequest: false
   selfServiceLinksEnabled: false
   url: https://login.some.test.domain.com:555/uaa
@@ -423,6 +424,16 @@ oauth:
   client:
     encoder_cache: false
     encoder_expiry: 600
+    secret:
+      policy:
+        minLength: 8
+        maxLength: 128
+        requireUpperCaseCharacter: 1
+        requireLowerCaseCharacter: 3
+        requireDigit: 2
+        requireSpecialCharacter: 0
+        expireSecretInMonths: 7
+
   clients:
     cc-service-dashboards:
       authorities: clients.read,clients.write,clients.admin

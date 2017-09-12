@@ -72,7 +72,6 @@ import org.springframework.security.oauth2.common.util.RandomValueStringGenerato
 import org.springframework.security.oauth2.provider.client.BaseClientDetails;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.util.StringUtils;
 import org.springframework.web.client.DefaultResponseErrorHandler;
 import org.springframework.web.client.RestOperations;
 import org.springframework.web.client.RestTemplate;
@@ -84,9 +83,11 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.UnknownHostException;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -108,6 +109,7 @@ import static org.springframework.http.HttpHeaders.ACCEPT;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 import static org.springframework.security.oauth2.common.util.OAuth2Utils.USER_OAUTH_APPROVAL;
+import static org.springframework.util.StringUtils.hasText;
 
 public class IntegrationTestUtils {
 
@@ -130,6 +132,16 @@ public class IntegrationTestUtils {
 
         return user;
     }
+
+    public static boolean isMember(String userId, ScimGroup group) {
+        for (ScimGroupMember member : group.getMembers()) {
+            if(userId.equals(member.getMemberId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 
     public static UserInfoResponse getUserInfo(String url, String token) throws URISyntaxException {
         RestTemplate rest = new RestTemplate(createRequestFactory(true));
@@ -251,6 +263,29 @@ public class IntegrationTestUtils {
         user.setPassword("secr3T");
         user.setPhoneNumbers(Collections.singletonList(new PhoneNumber(phoneNumber)));
         return client.postForEntity(url+"/Users", user, ScimUser.class).getBody();
+    }
+
+    public static ScimUser createUser(String token, String url, ScimUser user, String zoneSwitchId) {
+        RestTemplate template = new RestTemplate();
+        MultiValueMap<String,String> headers = new LinkedMultiValueMap<>();
+        headers.add("Accept", APPLICATION_JSON_VALUE);
+        headers.add("Authorization", "bearer " + token);
+        headers.add("Content-Type", APPLICATION_JSON_VALUE);
+        headers.add("If-Match", String.valueOf(user.getVersion()));
+        if (hasText(zoneSwitchId)) {
+            headers.add(IdentityZoneSwitchingFilter.HEADER, zoneSwitchId);
+        }
+        HttpEntity getHeaders = new HttpEntity(user,headers);
+        ResponseEntity<ScimUser> userInfoGet = template.exchange(
+            url+"/Users",
+            HttpMethod.POST,
+            getHeaders,
+            ScimUser.class
+        );
+        if (userInfoGet.getStatusCode() == HttpStatus.CREATED) {
+            return userInfoGet.getBody();
+        }
+        throw new RuntimeException("Invalid return code:"+userInfoGet.getStatusCode());
     }
 
     public static ScimUser updateUser(String token, String url, ScimUser user) {
@@ -450,7 +485,7 @@ public class IntegrationTestUtils {
         headers.add("Accept", APPLICATION_JSON_VALUE);
         headers.add("Authorization", "bearer " + token);
         headers.add("Content-Type", APPLICATION_JSON_VALUE);
-        if (StringUtils.hasText(zoneId)) {
+        if (hasText(zoneId)) {
             headers.add(IdentityZoneSwitchingFilter.HEADER, zoneId);
         }
         ResponseEntity<SearchResults<ScimGroup>> findGroup = template.exchange(
@@ -477,7 +512,7 @@ public class IntegrationTestUtils {
         headers.add("Accept", APPLICATION_JSON_VALUE);
         headers.add("Authorization", "bearer " + token);
         headers.add("Content-Type", APPLICATION_JSON_VALUE);
-        if (StringUtils.hasText(zoneId)) {
+        if (hasText(zoneId)) {
             headers.add(IdentityZoneSwitchingFilter.HEADER, zoneId);
         }
         ResponseEntity<ScimGroup> createGroup = template.exchange(
@@ -500,7 +535,7 @@ public class IntegrationTestUtils {
         headers.add("Authorization", "bearer " + token);
         headers.add("If-Match", "*");
         headers.add("Content-Type", APPLICATION_JSON_VALUE);
-        if (StringUtils.hasText(zoneId)) {
+        if (hasText(zoneId)) {
             headers.add(IdentityZoneSwitchingFilter.HEADER, zoneId);
         }
         ResponseEntity<ScimGroup> updateGroup = template.exchange(
@@ -539,7 +574,7 @@ public class IntegrationTestUtils {
         headers.add("Accept", APPLICATION_JSON_VALUE);
         headers.add("Authorization", "bearer " + token);
         headers.add("Content-Type", APPLICATION_JSON_VALUE);
-        if (StringUtils.hasText(zoneId)) {
+        if (hasText(zoneId)) {
             headers.add(IdentityZoneSwitchingFilter.HEADER, zoneId);
         }
         ResponseEntity<ScimGroupExternalMember> mapGroup = template.exchange(
@@ -594,8 +629,10 @@ public class IntegrationTestUtils {
             IdentityZone existing = JsonUtils.readValue(zoneGet.getBody(), IdentityZone.class);
             existing.setSubdomain(subdomain);
             existing.setConfig(config);
-            client.put(url + "/identity-zones/{id}", existing, id);
-            return existing;
+            HttpEntity<IdentityZone> updateZoneRequest = new HttpEntity<>(existing);
+            ResponseEntity<String> getUpdatedZone = client.exchange(url + "/identity-zones/{id}", HttpMethod.PUT, updateZoneRequest, String.class, id);
+            IdentityZone updatedZone = JsonUtils.readValue(getUpdatedZone.getBody(), IdentityZone.class);
+            return updatedZone;
         }
         IdentityZone identityZone = fixtureIdentityZone(id, subdomain, config);
         ResponseEntity<IdentityZone> zone = client.postForEntity(url + "/identity-zones", identityZone, IdentityZone.class);
@@ -666,7 +703,7 @@ public class IntegrationTestUtils {
         headers.add("Accept", APPLICATION_JSON_VALUE);
         headers.add("Authorization", "bearer "+ adminToken);
         headers.add("Content-Type", APPLICATION_JSON_VALUE);
-        if (StringUtils.hasText(switchToZoneId)) {
+        if (hasText(switchToZoneId)) {
             headers.add(IdentityZoneSwitchingFilter.HEADER, switchToZoneId);
         }
         HttpEntity getHeaders = new HttpEntity(JsonUtils.writeValueAsBytes(client), headers);
@@ -692,7 +729,7 @@ public class IntegrationTestUtils {
                 throw new RuntimeException("Invalid update return code:"+clientUpdate.getStatusCode());
             }
         }
-        throw new RuntimeException("Invalid crete return code:"+clientCreate.getStatusCode());
+        throw new RuntimeException("Invalid create return code:"+clientCreate.getStatusCode());
     }
 
     public static BaseClientDetails updateClient(RestTemplate template,
@@ -997,7 +1034,7 @@ public class IntegrationTestUtils {
         formData.add("username", username);
         formData.add("password", password);
         formData.add("response_type", "token id_token");
-        if (StringUtils.hasText(scopes)) {
+        if (hasText(scopes)) {
             formData.add("scope", scopes);
         }
         HttpHeaders headers = new HttpHeaders();
@@ -1093,7 +1130,7 @@ public class IntegrationTestUtils {
                                                                   boolean callCheckToken) throws Exception {
         BasicCookieStore cookies = new BasicCookieStore();
         // TODO Fix to use json API rather than HTML
-        if (StringUtils.hasText(jSessionId)) {
+        if (hasText(jSessionId)) {
             cookies.addCookie(new BasicClientCookie("JSESSIONID", jSessionId));
         }
 
@@ -1102,7 +1139,7 @@ public class IntegrationTestUtils {
                 .queryParam("response_type", "code")
                 .queryParam("state", mystateid)
                 .queryParam("client_id", clientId);
-        if( StringUtils.hasText(redirectUri)) {
+        if( hasText(redirectUri)) {
             builder = builder.queryParam("redirect_uri", redirectUri);
         }
         URI uri = builder.build();
@@ -1135,7 +1172,7 @@ public class IntegrationTestUtils {
         }
 
         MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
-        if (!StringUtils.hasText(jSessionId)) {
+        if (!hasText(jSessionId)) {
             // should be directed to the login screen...
             assertTrue(response.getBody().contains("/login.do"));
             assertTrue(response.getBody().contains("username"));
@@ -1185,17 +1222,17 @@ public class IntegrationTestUtils {
             assertEquals(HttpStatus.FOUND, response.getStatusCode());
             location = response.getHeaders().getLocation().toString();
         }
-        if (StringUtils.hasText(redirectUri)) {
+        if (hasText(redirectUri)) {
             assertTrue("Wrong location: " + location, location.matches(redirectUri + ".*code=.+"));
         }
 
         formData.clear();
         formData.add("client_id", clientId);
         formData.add("grant_type", "authorization_code");
-        if (StringUtils.hasText(redirectUri)) {
+        if (hasText(redirectUri)) {
             formData.add("redirect_uri", redirectUri);
         }
-        if (StringUtils.hasText(tokenResponseType)) {
+        if (hasText(tokenResponseType)) {
             formData.add("response_type", tokenResponseType);
         }
         formData.add("code", location.split("code=")[1].split("&")[0]);
@@ -1244,9 +1281,14 @@ public class IntegrationTestUtils {
     }
 
     public static void takeScreenShot(WebDriver webDriver) {
+        takeScreenShot("testscreenshot-", webDriver);
+    }
+    public static void takeScreenShot(String prefix, WebDriver webDriver) {
         File scrFile = ((TakesScreenshot)webDriver).getScreenshotAs(OutputType.FILE);
         try {
-            FileUtils.copyFile(scrFile, new File("testscreenshot-" + System.currentTimeMillis() + ".png"));
+            SimpleDateFormat format = new SimpleDateFormat("yyyyMMdd-HHmmss.SSS");
+            String now = format.format(new Date(System.currentTimeMillis()));
+            FileUtils.copyFile(scrFile, new File(prefix + now + ".png"));
         } catch (IOException e) {
             e.printStackTrace();
         }
