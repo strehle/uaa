@@ -11,7 +11,7 @@
         <module>client-lib</module>
         <module>model</module>
         <module>server</module>
-        <!--<module>uaa</module>-->
+        <module>uaa</module>
   </modules>
   <dependencyManagement>
      <dependencies>

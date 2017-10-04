@@ -12,6 +12,9 @@
   <artifactId>cloudfoundry-identity-uaa</artifactId>
   <version>4.6.1</version>
   <packaging>war</packaging>
+  <properties>
+    <maven.test.skip>true</maven.test.skip>
+  </properties>
   <name>UAA Web Application</name>
   <description>Cloud Foundry User Account and Authentication</description>
   <url>http://github.com//cloudfoundry/uaa</url>
