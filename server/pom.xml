@@ -2,7 +2,7 @@
 <project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <parent>
-     <version>4.6.1</version>
+     <version>4.7.1</version>
      <groupId>org.cloudfoundry.identity</groupId>
      <artifactId>cloudfoundry-identity-parent</artifactId>
   </parent>
@@ -10,7 +10,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.cloudfoundry.identity</groupId>
   <artifactId>cloudfoundry-identity-server</artifactId>
-  <version>4.6.1</version>
+  <version>4.7.1</version>
   <name>UAA Server Library</name>
   <description>Cloud Foundry User Account and Authentication</description>
   <url>http://github.com//cloudfoundry/uaa</url>
@@ -54,7 +54,7 @@
     <dependency>
       <groupId>org.cloudfoundry.identity</groupId>
       <artifactId>cloudfoundry-identity-model</artifactId>
-      <version>4.6.1</version>
+      <version>4.7.1</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
@@ -84,37 +84,37 @@
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-beans</artifactId>
-      <version>4.3.9.RELEASE</version>
+      <version>4.3.11.RELEASE</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-context</artifactId>
-      <version>4.3.9.RELEASE</version>
+      <version>4.3.11.RELEASE</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-tx</artifactId>
-      <version>4.3.9.RELEASE</version>
+      <version>4.3.11.RELEASE</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-jdbc</artifactId>
-      <version>4.3.6.RELEASE</version>
+      <version>4.3.11.RELEASE</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-web</artifactId>
-      <version>4.3.9.RELEASE</version>
+      <version>4.3.11.RELEASE</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-context-support</artifactId>
-      <version>4.3.6.RELEASE</version>
+      <version>4.3.11.RELEASE</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
@@ -200,8 +200,8 @@
         </dependency>
         <dependency>
             <groupId>org.apache.velocity</groupId>
-            <artifactId>velocity</artifactId>
-            <version>1.7</version>
+            <artifactId>velocity-engine-core</artifactId>
+            <version>2.0</version>
         </dependency>
         <dependency>
             <groupId>org.apache.santuario</groupId>
@@ -430,13 +430,13 @@
     <dependency>
       <groupId>org.springframework.ldap</groupId>
       <artifactId>spring-ldap-core</artifactId>
-      <version>2.1.0.RELEASE</version>
+      <version>2.3.2.RELEASE</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.springframework.ldap</groupId>
       <artifactId>spring-ldap-core-tiger</artifactId>
-      <version>2.1.0.RELEASE</version>
+      <version>2.3.2.RELEASE</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
@@ -466,7 +466,7 @@
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-test</artifactId>
-      <version>4.3.6.RELEASE</version>
+      <version>4.3.11.RELEASE</version>
       <scope>test</scope>
     </dependency>
     <dependency>

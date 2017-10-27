@@ -368,7 +368,7 @@ public class TokenEndpointDocs extends AbstractTokenMockMvcTests {
         provider.setOriginKey(origin);
 
         IdentityZoneHolder.set(zone.getIdentityZone());
-        getWebApplicationContext().getBean(JdbcIdentityProviderProvisioning.class).create(provider);
+        getWebApplicationContext().getBean(JdbcIdentityProviderProvisioning.class).create(provider, zone.getIdentityZone().getId());
 //        getWebApplicationContext().getBean(ZoneAwareIdpMetadataManager.class).refreshAllProviders();
         IdentityZoneHolder.clear();
 
@@ -707,7 +707,7 @@ public class TokenEndpointDocs extends AbstractTokenMockMvcTests {
                         true
                 );
         Snippet requestHeaders = requestHeaders(
-            headerWithName("Authorization").description("Bearer token with uaa.admin or tokens.revoke scope. Any token with the matching client_id may also be used for self revocation."),
+            headerWithName("Authorization").description("Bearer token with uaa.admin or tokens.revoke scope."),
             IDENTITY_ZONE_ID_HEADER,
             IDENTITY_ZONE_SUBDOMAIN_HEADER
         );
@@ -745,7 +745,7 @@ public class TokenEndpointDocs extends AbstractTokenMockMvcTests {
                 client.getClientSecret(),
                 user.getUserName(),
                 user.getPassword(),
-                "",
+                "openid",
                 IdentityZoneHolder.get(),
                 true
         );
@@ -760,7 +760,7 @@ public class TokenEndpointDocs extends AbstractTokenMockMvcTests {
         MockHttpServletRequestBuilder delete = RestDocumentationRequestBuilders.delete("/oauth/token/revoke/{tokenId}", userInfoToken);
 
         getMockMvc().perform(delete
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + userInfoToken))
                 .andExpect(status().isOk())
                 .andDo(document("{ClassName}/{methodName}", preprocessResponse(prettyPrint()), requestHeaders, pathParameters));
     }

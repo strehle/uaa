@@ -30,6 +30,7 @@ public class DefaultConfigurationTestSuite extends UaaBaseSuite {
 
     public static Class<?>[] suiteClasses() {
         Class<?>[] result = UaaJunitSuiteRunner.allSuiteClasses();
+        //Class<?>[] result = new Class[] {LimitedModeLoginMockMvcTests.class, LoginMockMvcTests.class};
         //Class<?>[] result = new Class[] {IdentityProviderEndpointsMockMvcTests.class, SamlIDPRefreshMockMvcTests.class};
         //for now, sort the test classes until we have figured out all
         //test poisoning that is occurring
