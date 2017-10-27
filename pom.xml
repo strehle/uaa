@@ -9,6 +9,7 @@
 
   <modules>
         <module>client-lib</module>
+        <module>metrics-data</module>
         <module>model</module>
         <module>server</module>
         <module>uaa</module>
