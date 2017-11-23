@@ -71,7 +71,15 @@
 #      - host2
 #      - testzone3.localhost
 #      - testzone4.localhost
-
+authentication:
+  policy:
+    countFailuresWithinSeconds: 7200
+    global:
+      countFailuresWithinSeconds: 2222
+      lockoutAfterFailures: 3
+      lockoutPeriodSeconds: 152
+    lockoutAfterFailures: 3
+    lockoutPeriodSeconds: 600
 #authentication:
 #  policy:
 #    lockoutAfterFailures: 5
