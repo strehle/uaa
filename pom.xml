@@ -4,7 +4,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.cloudfoundry.identity</groupId>
   <artifactId>cloudfoundry-identity-parent</artifactId>
-  <version>4.7.1</version>
+  <version>4.7.2</version>
   <packaging>pom</packaging>
 
   <modules>
