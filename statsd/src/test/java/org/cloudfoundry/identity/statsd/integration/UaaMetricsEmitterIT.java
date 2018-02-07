@@ -12,6 +12,15 @@
  *******************************************************************************/
 package org.cloudfoundry.identity.statsd.integration;
 
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.SocketTimeoutException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -24,15 +33,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestTemplate;
-
-import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.SocketTimeoutException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 import static org.cloudfoundry.identity.statsd.integration.IntegrationTestUtils.TEST_PASSWORD;
 import static org.cloudfoundry.identity.statsd.integration.IntegrationTestUtils.TEST_USERNAME;
@@ -49,9 +49,6 @@ public class UaaMetricsEmitterIT {
     private static byte[] receiveData;
     private static DatagramPacket receivePacket;
     private static Map<String, String> firstBatch;
-    private static List<String> perRequestFragments = Arrays.asList(
-        "uaa.requests.ui.latency"
-    );
 
     private static List<String> metricFragments = Arrays.asList(
         "uaa.audit_service.user_authentication_count",
@@ -81,7 +78,6 @@ public class UaaMetricsEmitterIT {
         "uaa.requests.ui.completed.count",
         "uaa.requests.ui.completed.time",
         "uaa.server.up.time",
-        "uaa.requests.ui.latency",
         "uaa.server.idle.time",
         "uaa.vitals.vm.cpu.count",
         "uaa.vitals.vm.cpu.load",
@@ -96,8 +92,6 @@ public class UaaMetricsEmitterIT {
         "uaa.vitals.jvm.heap.max",
         "uaa.vitals.jvm.non-heap.init",
         "uaa.vitals.jvm.non-heap.committed"
-//        ,"uaa.vitals.jvm.non-heap.used", //max return -1 and are not emitted
-//        "uaa.vitals.jvm.non-heap.max"    //max return -1 and are not emitted
     );
     private static Map<String, String> secondBatch;
 
@@ -119,6 +113,7 @@ public class UaaMetricsEmitterIT {
         serverSocket.setSoTimeout(1000);
         receiveData = new byte[65535];
         receivePacket = new DatagramPacket(receiveData, receiveData.length);
+        performSimpleGet();
         firstBatch = getMessages(metricFragments, WAIT_FOR_MESSAGE);
         performSimpleGet();
         performLogin(TEST_USERNAME);
@@ -127,32 +122,18 @@ public class UaaMetricsEmitterIT {
     }
 
     @Test
-    public void assert_gauge_metrics() throws IOException {
+    public void assert_generic_metrics() throws IOException {
         String data1 = firstBatch.get(statsDKey);
         String data2 = secondBatch.get(statsDKey);
 
-        if(!perRequestFragments.contains(statsDKey)) {
-            assertNotNull("Expected to find message for:'" + statsDKey + "' in the first batch.", data1);
-            long first = IntegrationTestUtils.getGaugeValueFromMessage(data1);
-            assertThat(statsDKey + " first value must have a positive value.", first, greaterThanOrEqualTo(0l));
+        assertNotNull("Expected to find message for:'" + statsDKey + "' in the first batch.", data1);
+        long first = IntegrationTestUtils.getStatsDValueFromMessage(data1);
+        assertThat(statsDKey + " first value must have a positive value.", first, greaterThanOrEqualTo(0l));
 
-            assertNotNull("Expected to find message for:'"+statsDKey+"' in the second batch.", data2);
-            long second = IntegrationTestUtils.getGaugeValueFromMessage(data2);
-            assertThat(statsDKey + " second value must have a positive value.", second, greaterThanOrEqualTo(0l));
-        }
+        assertNotNull("Expected to find message for:'"+statsDKey+"' in the second batch.", data2);
+        long second = IntegrationTestUtils.getStatsDValueFromMessage(data2);
+        assertThat(statsDKey + " second value must have a positive value.", second, greaterThanOrEqualTo(0l));
     }
-
-    @Test
-    public void assert_per_request_metrics() throws IOException {
-        String data2 = secondBatch.get(statsDKey);
-
-        if(perRequestFragments.contains(statsDKey)) {
-            assertNotNull("Expected to find message for:'"+statsDKey+"' in the second batch.", data2);
-            long second = IntegrationTestUtils.getTimeValueFromMessage(data2);
-            assertThat(statsDKey + " second value must have a positive value.", second, greaterThanOrEqualTo(0l));
-        }
-    }
-
 
     protected static Map<String,String> getMessages(List<String> fragments, int timeout) throws IOException {
         long startTime = System.currentTimeMillis();

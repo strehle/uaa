@@ -12,7 +12,23 @@
  *******************************************************************************/
 package org.cloudfoundry.identity.uaa.login;
 
-import org.apache.tomcat.jdbc.pool.DataSource;
+import javax.servlet.RequestDispatcher;
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.net.URL;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.EventListener;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Scanner;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import org.cloudfoundry.identity.uaa.account.ResetPasswordController;
 import org.cloudfoundry.identity.uaa.authentication.manager.AuthzAuthenticationManager;
 import org.cloudfoundry.identity.uaa.authentication.manager.PeriodLockoutPolicy;
@@ -25,6 +41,10 @@ import org.cloudfoundry.identity.uaa.message.EmailService;
 import org.cloudfoundry.identity.uaa.message.NotificationsService;
 import org.cloudfoundry.identity.uaa.message.util.FakeJavaMailSender;
 import org.cloudfoundry.identity.uaa.metrics.UaaMetricsFilter;
+import org.cloudfoundry.identity.uaa.mfa.GoogleMfaProviderConfig;
+import org.cloudfoundry.identity.uaa.mfa.JdbcMfaProviderProvisioning;
+import org.cloudfoundry.identity.uaa.mfa.MfaProvider;
+import org.cloudfoundry.identity.uaa.mfa.MfaProviderProvisioning;
 import org.cloudfoundry.identity.uaa.mock.oauth.CheckDefaultAuthoritiesMvcMockTests;
 import org.cloudfoundry.identity.uaa.oauth.CheckTokenEndpoint;
 import org.cloudfoundry.identity.uaa.oauth.UaaTokenServices;
@@ -42,7 +62,7 @@ import org.cloudfoundry.identity.uaa.provider.OIDCIdentityProviderDefinition;
 import org.cloudfoundry.identity.uaa.provider.PasswordPolicy;
 import org.cloudfoundry.identity.uaa.provider.SamlIdentityProviderDefinition;
 import org.cloudfoundry.identity.uaa.provider.UaaIdentityProviderDefinition;
-import org.cloudfoundry.identity.uaa.provider.saml.BootstrapSamlIdentityProviderConfigurator;
+import org.cloudfoundry.identity.uaa.provider.saml.BootstrapSamlIdentityProviderData;
 import org.cloudfoundry.identity.uaa.provider.saml.LoginSamlEntryPoint;
 import org.cloudfoundry.identity.uaa.provider.saml.SamlSessionStorageFactory;
 import org.cloudfoundry.identity.uaa.provider.saml.ZoneAwareMetadataGenerator;
@@ -71,6 +91,8 @@ import org.cloudfoundry.identity.uaa.zone.IdentityZoneResolvingFilter;
 import org.cloudfoundry.identity.uaa.zone.Links;
 import org.cloudfoundry.identity.uaa.zone.SamlConfig;
 import org.cloudfoundry.identity.uaa.zone.TokenPolicy;
+
+import org.apache.tomcat.jdbc.pool.DataSource;
 import org.flywaydb.core.Flyway;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -86,6 +108,7 @@ import org.springframework.beans.factory.xml.ResourceEntityResolver;
 import org.springframework.beans.factory.xml.XmlBeanDefinitionReader;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.Environment;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpMethod;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
@@ -104,23 +127,6 @@ import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.context.support.AbstractRefreshableWebApplicationContext;
 import org.springframework.web.servlet.ViewResolver;
-
-import javax.servlet.RequestDispatcher;
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.Field;
-import java.net.URL;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.EventListener;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Scanner;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 import static org.cloudfoundry.identity.uaa.constants.OriginKeys.OAUTH20;
 import static org.cloudfoundry.identity.uaa.constants.OriginKeys.OIDC10;
@@ -143,6 +149,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.springframework.http.HttpHeaders.ACCEPT;
 import static org.springframework.http.HttpHeaders.ACCEPT_LANGUAGE;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
@@ -216,6 +223,7 @@ public class BootstrapTests {
 
         UaaMetricsFilter metricsFilter = context.getBean(UaaMetricsFilter.class);
         assertTrue(metricsFilter.isEnabled());
+        assertFalse(metricsFilter.isPerRequestMetrics());
 
         LimitedModeUaaFilter limitedModeUaaFilter = context.getBean(LimitedModeUaaFilter.class);
         assertNull(limitedModeUaaFilter.getStatusFile());
@@ -476,6 +484,7 @@ public class BootstrapTests {
 
         UaaMetricsFilter metricsFilter = context.getBean(UaaMetricsFilter.class);
         assertFalse(metricsFilter.isEnabled());
+        assertTrue(metricsFilter.isPerRequestMetrics());
 
         LimitedModeUaaFilter limitedModeUaaFilter = context.getBean(LimitedModeUaaFilter.class);
         assertEquals("/tmp/uaa-test-limited-mode-status-file.txt", limitedModeUaaFilter.getStatusFile().getAbsolutePath());
@@ -756,6 +765,14 @@ public class BootstrapTests {
         assertTrue(defaultOauthProvider.getConfig().isStoreCustomAttributes());
         assertFalse(defaultOauthProvider.getConfig().isSkipSslValidation());
 
+        List<String> deletedIdps = Arrays.asList("delete-discovery-provider", "delete.local");
+        for (String deleteOrigin : deletedIdps) {
+            try {
+                idpProvisioning.retrieveByOrigin(deleteOrigin, IdentityZone.getUaa().getId());
+                fail("The identity provider '" + deleteOrigin + "' should have been deleted");
+            } catch (EmptyResultDataAccessException e) {}
+        }
+
         IdentityZoneResolvingFilter filter = context.getBean(IdentityZoneResolvingFilter.class);
         assertThat(filter.getDefaultZoneHostnames(), containsInAnyOrder(uaa, login, "localhost", "host1.domain.com", "host2", "test3.localhost", "test4.localhost"));
         DataSource ds = context.getBean(DataSource.class);
@@ -846,16 +863,18 @@ public class BootstrapTests {
         assertThat(scimGroups, PredicateMatcher.<ScimGroup>has(g -> g.getDisplayName().equals("pony") && "The magic of friendship".equals(g.getDescription())));
         assertThat(scimGroups, PredicateMatcher.<ScimGroup>has(g -> g.getDisplayName().equals("cat") && "The cat".equals(g.getDescription())));
 
-        BootstrapSamlIdentityProviderConfigurator samlProviders = context.getBean(BootstrapSamlIdentityProviderConfigurator.class);
+        BootstrapSamlIdentityProviderData samlProviders = context.getBean(BootstrapSamlIdentityProviderData.class);
         IdentityProviderProvisioning providerProvisioning = context.getBean("identityProviderProvisioning", IdentityProviderProvisioning.class);
         assertTrue(samlProviders.getIdentityProviderDefinitions().size() >= 4);
         //verify that they got loaded in the DB
         for (SamlIdentityProviderDefinition def : samlProviders.getIdentityProviderDefinitions()) {
-            assertNotNull(providerProvisioning.retrieveByOrigin(def.getIdpEntityAlias(), IdentityZone.getUaa().getId()));
+            if (!deletedIdps.contains(def.getIdpEntityAlias())) {
+                assertNotNull(providerProvisioning.retrieveByOrigin(def.getIdpEntityAlias(), IdentityZone.getUaa().getId()));
+            }
         }
 
         assertEquals(3600, context.getBean("webSSOprofileConsumer", WebSSOProfileConsumerImpl.class).getMaxAuthenticationAge());
-        assertFalse(context.getBean(BootstrapSamlIdentityProviderConfigurator.class).isLegacyMetadataTrustCheck());
+        assertFalse(context.getBean(BootstrapSamlIdentityProviderData.class).isLegacyMetadataTrustCheck());
         assertNotNull(context.getBean("samlLogger", SAMLDefaultLogger.class));
 
 
@@ -894,6 +913,11 @@ public class BootstrapTests {
         ClientDetails ccSvcDashboard = clients.loadClientByClientId("cc-service-dashboards");
         assertNotNull(ccSvcDashboard);
 
+        MfaProviderProvisioning mfaProviderProvisioning = context.getBean(JdbcMfaProviderProvisioning.class);
+        MfaProvider<GoogleMfaProviderConfig> mfaProvider1 = mfaProviderProvisioning.retrieveByName("mfaprovider1", IdentityZoneHolder.getUaaZone().getId());
+        assertNotNull(mfaProvider1);
+        assertEquals("all-properties-set-description", mfaProvider1.getConfig().getProviderDescription());
+        assertEquals("google.com", mfaProvider1.getConfig().getIssuer());
 
     }
 
@@ -918,14 +942,14 @@ public class BootstrapTests {
     @Test
     public void legacy_saml_idp_as_top_level_element() throws Exception {
         System.setProperty("login.saml.metadataTrustCheck", "false");
-        System.setProperty("login.idpMetadataURL", "http://simplesamlphp.uaa-acceptance.cf-app.com/saml2/idp/metadata.php");
+        System.setProperty("login.idpMetadataURL", "http://simplesamlphp.oms.identity.team/saml2/idp/metadata.php");
         System.setProperty("login.idpEntityAlias", "testIDPFile");
 
         context = getServletContext("default", "login.yml","uaa.yml", "file:./src/main/webapp/WEB-INF/spring-servlet.xml");
         assertNotNull(context.getBean("viewResolver", ViewResolver.class));
         assertNotNull(context.getBean("samlLogger", SAMLDefaultLogger.class));
-        assertFalse(context.getBean(BootstrapSamlIdentityProviderConfigurator.class).isLegacyMetadataTrustCheck());
-        List<SamlIdentityProviderDefinition> defs = context.getBean(BootstrapSamlIdentityProviderConfigurator.class).getIdentityProviderDefinitions();
+        assertFalse(context.getBean(BootstrapSamlIdentityProviderData.class).isLegacyMetadataTrustCheck());
+        List<SamlIdentityProviderDefinition> defs = context.getBean(BootstrapSamlIdentityProviderData.class).getIdentityProviderDefinitions();
         assertNotNull(findProvider(defs, "testIDPFile"));
         assertEquals(
             SamlIdentityProviderDefinition.MetadataLocation.URL,
@@ -951,7 +975,7 @@ public class BootstrapTests {
         System.setProperty("login.idpMetadata", metadataString);
         System.setProperty("login.idpEntityAlias", "testIDPData");
         context = getServletContext("default,saml,configMetadata", "login.yml","uaa.yml", "file:./src/main/webapp/WEB-INF/spring-servlet.xml");
-        List<SamlIdentityProviderDefinition> defs = context.getBean(BootstrapSamlIdentityProviderConfigurator.class).getIdentityProviderDefinitions();
+        List<SamlIdentityProviderDefinition> defs = context.getBean(BootstrapSamlIdentityProviderData.class).getIdentityProviderDefinitions();
         assertEquals(
             SamlIdentityProviderDefinition.MetadataLocation.DATA,
             findProvider(defs, "testIDPData").getType());
@@ -961,14 +985,14 @@ public class BootstrapTests {
     @Test
     public void legacy_saml_metadata_as_url() throws Exception {
         System.setProperty("login.saml.metadataTrustCheck", "false");
-        System.setProperty("login.idpMetadataURL", "http://simplesamlphp.uaa-acceptance.cf-app.com:80/saml2/idp/metadata.php");
+        System.setProperty("login.idpMetadataURL", "http://simplesamlphp.oms.identity.team:80/saml2/idp/metadata.php");
         System.setProperty("login.idpEntityAlias", "testIDPUrl");
 
         context = getServletContext("default", "login.yml","uaa.yml", "file:./src/main/webapp/WEB-INF/spring-servlet.xml");
         assertNotNull(context.getBean("viewResolver", ViewResolver.class));
         assertNotNull(context.getBean("samlLogger", SAMLDefaultLogger.class));
-        assertFalse(context.getBean(BootstrapSamlIdentityProviderConfigurator.class).isLegacyMetadataTrustCheck());
-        List<SamlIdentityProviderDefinition> defs = context.getBean(BootstrapSamlIdentityProviderConfigurator.class).getIdentityProviderDefinitions();
+        assertFalse(context.getBean(BootstrapSamlIdentityProviderData.class).isLegacyMetadataTrustCheck());
+        List<SamlIdentityProviderDefinition> defs = context.getBean(BootstrapSamlIdentityProviderData.class).getIdentityProviderDefinitions();
         assertNull(
             defs.get(defs.size() - 1).getSocketFactoryClassName()
         );
@@ -982,16 +1006,16 @@ public class BootstrapTests {
     @Test
     public void legacy_saml_url_without_port() throws Exception {
         System.setProperty("login.saml.metadataTrustCheck", "false");
-        System.setProperty("login.idpMetadataURL", "http://simplesamlphp.uaa-acceptance.cf-app.com/saml2/idp/metadata.php");
+        System.setProperty("login.idpMetadataURL", "http://simplesamlphp.oms.identity.team/saml2/idp/metadata.php");
         System.setProperty("login.idpEntityAlias", "testIDPUrl");
 
         context = getServletContext("default", "login.yml","uaa.yml", "file:./src/main/webapp/WEB-INF/spring-servlet.xml");
         assertNotNull(context.getBean("viewResolver", ViewResolver.class));
         assertNotNull(context.getBean("samlLogger", SAMLDefaultLogger.class));
-        assertFalse(context.getBean(BootstrapSamlIdentityProviderConfigurator.class).isLegacyMetadataTrustCheck());
-        List<SamlIdentityProviderDefinition> defs = context.getBean(BootstrapSamlIdentityProviderConfigurator.class).getIdentityProviderDefinitions();
+        assertFalse(context.getBean(BootstrapSamlIdentityProviderData.class).isLegacyMetadataTrustCheck());
+        List<SamlIdentityProviderDefinition> defs = context.getBean(BootstrapSamlIdentityProviderData.class).getIdentityProviderDefinitions();
         assertFalse(
-            context.getBean(BootstrapSamlIdentityProviderConfigurator.class).getIdentityProviderDefinitions().isEmpty()
+            context.getBean(BootstrapSamlIdentityProviderData.class).getIdentityProviderDefinitions().isEmpty()
         );
         assertNull(
             defs.get(defs.size() - 1).getSocketFactoryClassName()

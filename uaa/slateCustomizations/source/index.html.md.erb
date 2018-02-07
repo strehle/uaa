@@ -492,6 +492,28 @@ _Response Fields_
 
 <%= ERB.new(File.read("../../build/generated-snippets/CheckTokenEndpointDocs/checkToken/response-fields.md")).result(binding) %>
 
+# Introspect Token
+
+Introspect token endpoint is [RFC-7662](https://tools.ietf.org/html/rfc7662) Complaint. Active flag is responsible for showing the validity of the token and not the HTTP status code.
+Status code will be 200 OK for both valid and invalid tokens.
+
+<%= ERB.new(File.read("../../build/generated-snippets/IntrospectTokenEndpointDocs/introspectToken/curl-request.md")).result(binding) %>
+<%= ERB.new(File.read("../../build/generated-snippets/IntrospectTokenEndpointDocs/introspectToken/http-request.md")).result(binding) %>
+<%= ERB.new(File.read("../../build/generated-snippets/IntrospectTokenEndpointDocs/introspectToken/http-response.md")).result(binding) %>
+
+_Request Headers_
+
+<%= ERB.new(File.read("../../build/generated-snippets/IntrospectTokenEndpointDocs/introspectToken/request-headers.md")).result(binding) %>
+
+_Request Parameters_
+
+<%= ERB.new(File.read("../../build/generated-snippets/IntrospectTokenEndpointDocs/introspectToken/request-parameters.md")).result(binding) %>
+
+_Response Fields_
+
+<%= ERB.new(File.read("../../build/generated-snippets/IntrospectTokenEndpointDocs/introspectToken/response-fields.md")).result(binding) %>
+
+
 # Token Key(s)
 
 ## Token Key
@@ -1328,32 +1350,18 @@ _Error Codes_
 <aside class="warning">
   MFA support is in active development and is not ready for production use.
 </aside>
+<aside class="warning">
+  Update is not supported for MFA provider.
+</aside>
 
-<%= ERB.new(File.read("../../build/generated-snippets/MfaProviderEndpointsDocs/testUpdateMfaProvider/curl-request.md")).result(binding) %>
-<%= ERB.new(File.read("../../build/generated-snippets/MfaProviderEndpointsDocs/testUpdateMfaProvider/http-request.md")).result(binding) %>
-<%= ERB.new(File.read("../../build/generated-snippets/MfaProviderEndpointsDocs/testUpdateMfaProvider/http-response.md")).result(binding) %>
 
-_Request Headers_
 
-<%= ERB.new(File.read("../../build/generated-snippets/MfaProviderEndpointsDocs/testUpdateMfaProvider/request-headers.md")).result(binding) %>
-
-_Request Fields_
-
-<%= ERB.new(File.read("../../build/generated-snippets/MfaProviderEndpointsDocs/testUpdateMfaProvider/request-fields.md")).result(binding) %>
-
-_Response Fields_
-
-<%= ERB.new(File.read("../../build/generated-snippets/MfaProviderEndpointsDocs/testUpdateMfaProvider/response-fields.md")).result(binding) %>
 
 _Error Codes_
 
 | Error Code | Description                                                                                            |
 |------------|--------------------------------------------------------------------------------------------------------|
-| 400        | Bad Request - JSON body was malformed or missing fields                                                |
-| 401        | Unauthorized - Invalid token                                                                           |
-| 403        | Forbidden - Insufficient scope (`uaa.admin` or `zones.<zoneId>.admin` is required to create a MFA provider)|
-| 422        | Unprocessable Entity - Some values in the MFA configuration are invalid                                |
-| 404        | Not Found - Provider id not found                                                                      |
+| 405        | Method Not Allowed                                                                                     |
 
 
 ## Get
@@ -1868,6 +1876,27 @@ _Error Codes_
 | Error Code | Description                                                           |
 |------------|-----------------------------------------------------------------------|
 | 400        | Bad Request - Incorrect version supplied in If-Match header           |
+| 403        | Forbidden - Insufficient scope or internal user management disabled   |
+| 404        | Not Found - User not found                                            |
+
+## Delete MFA registration
+
+<%= ERB.new(File.read("../../build/generated-snippets/ScimUserEndpointDocs/deleteMfaRegistration/curl-request.md")).result(binding) %>
+<%= ERB.new(File.read("../../build/generated-snippets/ScimUserEndpointDocs/deleteMfaRegistration/http-request.md")).result(binding) %>
+<%= ERB.new(File.read("../../build/generated-snippets/ScimUserEndpointDocs/deleteMfaRegistration/http-response.md")).result(binding) %>
+
+_Path Parameters_
+
+<%= ERB.new(File.read("../../build/generated-snippets/ScimUserEndpointDocs/deleteMfaRegistration/path-parameters.md")).result(binding) %>
+
+_Request Headers_
+
+<%= ERB.new(File.read("../../build/generated-snippets/ScimUserEndpointDocs/deleteMfaRegistration/request-headers.md")).result(binding) %>
+
+_Error Codes_
+
+| Error Code | Description                                                           |
+|------------|-----------------------------------------------------------------------|
 | 403        | Forbidden - Insufficient scope or internal user management disabled   |
 | 404        | Not Found - User not found                                            |
 

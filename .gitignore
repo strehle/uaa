@@ -31,6 +31,7 @@ build/
 bin
 phantomjsdriver.log
 
+uaa/node_modules
 # Docs
 uaa/slate/package-lock.json
 uaa/slate/node_modules

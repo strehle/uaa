@@ -3,7 +3,7 @@
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 
   <parent>
-     <version>4.8.0-SNAPSHOT</version>
+     <version>4.11.0-SNAPSHOT</version>
      <groupId>org.cloudfoundry.identity</groupId>
      <artifactId>cloudfoundry-identity-parent</artifactId>
   </parent>
@@ -11,7 +11,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.cloudfoundry.identity</groupId>
   <artifactId>cloudfoundry-identity-metrics-data</artifactId>
-  <version>4.8.0-SNAPSHOT</version>
+  <version>4.11.0-SNAPSHOT</version>
   <name>UAA Metrics</name>
   <description>Cloud Foundry User Account and Authentication</description>
   <url>http://github.com//cloudfoundry/uaa</url>
@@ -55,7 +55,13 @@
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
-      <version>2.9.1</version>
+      <version>2.9.4</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-annotations</artifactId>
+      <version>2.9.4</version>
       <scope>compile</scope>
     </dependency>
     <dependency>

@@ -18,6 +18,7 @@ import org.cloudfoundry.identity.uaa.ServerRunning;
 import org.cloudfoundry.identity.uaa.constants.OriginKeys;
 import org.cloudfoundry.identity.uaa.integration.util.IntegrationTestUtils;
 import org.cloudfoundry.identity.uaa.oauth.token.CompositeAccessToken;
+import org.cloudfoundry.identity.uaa.oauth.token.TokenConstants;
 import org.cloudfoundry.identity.uaa.provider.IdentityProvider;
 import org.cloudfoundry.identity.uaa.provider.SamlIdentityProviderDefinition;
 import org.cloudfoundry.identity.uaa.provider.saml.idp.SamlServiceProvider;
@@ -31,7 +32,6 @@ import org.cloudfoundry.identity.uaa.zone.IdentityZone;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneConfiguration;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneSwitchingFilter;
 import org.cloudfoundry.identity.uaa.zone.SamlConfig;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -77,10 +77,10 @@ import static org.cloudfoundry.identity.uaa.provider.saml.SamlKeyManagerFactoryT
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
-import static org.junit.Assume.assumeTrue;
+import static org.junit.Assert.assertTrue;
 
 
 @RunWith(SpringJUnit4ClassRunner.class)
@@ -122,6 +122,7 @@ public class SamlLoginWithLocalIdpIT {
         webDriver.manage().deleteAllCookies();
         webDriver.get("http://simplesamlphp.cfapps.io/module.php/core/authenticate.php?as=example-userpass&logout");
         webDriver.get("http://simplesamlphp2.cfapps.io/module.php/core/authenticate.php?as=example-userpass&logout");
+        assertTrue("Expected testzone1.localhost and testzone2.localhost to resolve to 127.0.0.1", doesSupportZoneDNS());
     }
 
     /**
@@ -131,8 +132,8 @@ public class SamlLoginWithLocalIdpIT {
     public void testDownloadSamlIdpMetadata() {
         String entityId = IDP_ENTITY_ID;
         SamlIdentityProviderDefinition idpDefinition = createLocalSamlIdpDefinition(entityId, "uaa");
-        Assert.assertTrue(idpDefinition.getMetaDataLocation().contains(IDPSSODescriptor.DEFAULT_ELEMENT_LOCAL_NAME));
-        Assert.assertTrue(idpDefinition.getMetaDataLocation().contains("entityID=\"" + entityId + "\""));
+        assertTrue(idpDefinition.getMetaDataLocation().contains(IDPSSODescriptor.DEFAULT_ELEMENT_LOCAL_NAME));
+        assertTrue(idpDefinition.getMetaDataLocation().contains("entityID=\"" + entityId + "\""));
     }
 
     /**
@@ -315,7 +316,7 @@ public class SamlLoginWithLocalIdpIT {
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
         LinkedMultiValueMap<String, String> postBody = new LinkedMultiValueMap<>();
-        postBody.add("grant_type", "urn:ietf:params:oauth:grant-type:saml2-bearer");
+        postBody.add("grant_type", TokenConstants.GRANT_TYPE_SAML2_BEARER);
         postBody.add("client_id", "oauth_showcase_saml2_bearer");
         postBody.add("client_secret", "secret");
         postBody.add("assertion",
@@ -381,7 +382,7 @@ public class SamlLoginWithLocalIdpIT {
                                                                              CompositeAccessToken.class);
 
         assertEquals(HttpStatus.OK, token.getStatusCode());
-        Assert.assertTrue(token.hasBody());
+        assertTrue(token.hasBody());
         provider.setActive(false);
         IntegrationTestUtils.updateIdentityProvider(this.baseUrl, this.serverRunning, provider);
     }
@@ -402,12 +403,11 @@ public class SamlLoginWithLocalIdpIT {
         SamlServiceProviderDefinition spDef = createLocalSamlSpDefinition("cloudfoundry-saml-login", "uaa");
         createSamlServiceProvider("Local SAML SP", "cloudfoundry-saml-login", baseUrl, serverRunning, spDef);
 
-        // tells us that we are on travis
-        assumeTrue("Expected testzone1/2.localhost to resolve to 127.0.0.1", doesSupportZoneDNS());
-
         webDriver.get(baseUrl + firstUrl);
+        IntegrationTestUtils.takeScreenShot(webDriver);
         assertEquals("Cloud Foundry", webDriver.getTitle());
         webDriver.findElement(By.xpath("//a[text()='" + provider.getConfig().getLinkText() + "']")).click();
+
         webDriver.findElement(By.xpath("//h1[contains(text(), 'Welcome!')]"));
         webDriver.findElement(By.name("username")).clear();
         webDriver.findElement(By.name("username")).sendKeys(username);
@@ -458,8 +458,6 @@ public class SamlLoginWithLocalIdpIT {
     @SuppressWarnings("unchecked")
     @Test
     public void idp_initiated_login() throws Exception {
-        assumeTrue("Expected testzone1/2.localhost to resolve to 127.0.0.1", doesSupportZoneDNS());
-
         //zone1 is IDP (create SP config and user here)
         //zone2 is SP (create IDP config here)
         //start at zone_1_url
@@ -520,7 +518,6 @@ public class SamlLoginWithLocalIdpIT {
     @SuppressWarnings("unchecked")
     @Test
     public void testLocalSamlIdpLoginInTestZone1Works() throws Exception {
-        assumeTrue("Expected testzone1/2.localhost to resolve to 127.0.0.1", doesSupportZoneDNS());
         String zoneId = "testzone1";
 
         RestTemplate identityClient = getIdentityClient();
@@ -609,7 +606,6 @@ public class SamlLoginWithLocalIdpIT {
     @SuppressWarnings("unchecked")
     @Test
     public void testWebSSOProfileWithArtifactInMetadataSamlIntegration() throws Exception {
-        assumeTrue("Expected testzone1/2.localhost to resolve to 127.0.0.1", doesSupportZoneDNS());
         String idpZoneId = "testzone1";
         String spZoneId = "testzone2";
 
@@ -687,7 +683,6 @@ public class SamlLoginWithLocalIdpIT {
     @SuppressWarnings("unchecked")
     @Test
     public void testWebSSOProfileWithRedirectPostSamlIntegration() throws Exception {
-        assumeTrue("Expected testzone1/2.localhost to resolve to 127.0.0.1", doesSupportZoneDNS());
         String idpZoneId = "testzone1";
         String spZoneId = "testzone2";
 
@@ -759,7 +754,6 @@ public class SamlLoginWithLocalIdpIT {
 
     @Test
     public void testEntityIdFromZoneConfig() throws Exception{
-        assumeTrue("Expected testzone1/2.localhost to resolve to 127.0.0.1", doesSupportZoneDNS());
         String idpZoneId = "testzone1";
         String spZoneId = "testzone2";
 
@@ -820,7 +814,6 @@ public class SamlLoginWithLocalIdpIT {
 
     @Test
     public void testSamlServiceProviderAttributeMappings() throws Exception {
-        assumeTrue("Expected testzone1/2.localhost to resolve to 127.0.0.1", doesSupportZoneDNS());
         String idpZoneId = "testzone1";
         String spZoneId = "testzone2";
         Map<String, Object> attributeMappings = new HashMap<>();
@@ -880,8 +873,6 @@ public class SamlLoginWithLocalIdpIT {
     @SuppressWarnings("unchecked")
     @Test
     public void testCrossZoneSamlIntegration() throws Exception {
-        assumeTrue("Expected testzone1/2.localhost to resolve to 127.0.0.1", doesSupportZoneDNS());
-
         String idpZoneId = "testzone1";
         String idpZoneUrl = baseUrl.replace("localhost", idpZoneId + ".localhost");
 
@@ -1035,7 +1026,6 @@ public class SamlLoginWithLocalIdpIT {
             assertNotNull(afterLogin.getValue());
             assertNotEquals(beforeLogin.getValue(), afterLogin.getValue());
         } catch (Exception e) {
-            Assert.
             assertTrue("Http-Artifact binding is not supported",e instanceof NoSuchElementException);
 
         }

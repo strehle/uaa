@@ -34,6 +34,7 @@ import org.cloudfoundry.identity.uaa.oauth.token.CompositeAccessToken;
 import org.cloudfoundry.identity.uaa.oauth.token.JdbcRevocableTokenProvisioning;
 import org.cloudfoundry.identity.uaa.oauth.token.RevocableToken;
 import org.cloudfoundry.identity.uaa.oauth.token.RevocableTokenProvisioning;
+import org.cloudfoundry.identity.uaa.oauth.token.TokenConstants;
 import org.cloudfoundry.identity.uaa.oauth.token.UaaTokenEndpoint;
 import org.cloudfoundry.identity.uaa.provider.IdentityProvider;
 import org.cloudfoundry.identity.uaa.provider.JdbcIdentityProviderProvisioning;
@@ -66,7 +67,6 @@ import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.opensaml.xml.ConfigurationException;
-import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.env.MockEnvironment;
@@ -119,7 +119,6 @@ import java.util.TreeSet;
 
 import static java.util.Collections.emptySet;
 import static org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils.CookieCsrfPostProcessor.cookieCsrf;
-import static org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils.getClientCredentialsOAuthAccessToken;
 import static org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils.getUserOAuthAccessToken;
 import static org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils.setDisableInternalAuth;
 import static org.cloudfoundry.identity.uaa.oauth.TokenTestSupport.AUTHORIZATION_CODE;
@@ -153,7 +152,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
 import static org.springframework.http.HttpHeaders.HOST;
@@ -437,6 +435,15 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
         doPasswordGrant(username, SECRET, clientId, SECRET, status().isOk());
     }
 
+    @Test
+    public void password_grant() throws Exception {
+        String username = "testuser"+ generator.generate();
+        String userScopes = "uaa.user";
+        ScimUser user = setUpUser(username, userScopes, OriginKeys.UAA, IdentityZone.getUaa().getId());
+        assertEquals(1, getWebApplicationContext().getBean(JdbcTemplate.class).update("UPDATE users SET passwd_change_required = ? WHERE ID = ?", true, user.getId()));
+        doPasswordGrant(username, SECRET, "cf", "", status().is4xxClientError());
+    }
+
 
     @Test
     public void test_logon_timestamps_with_password_grant() throws Exception {
@@ -519,7 +526,7 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
         Map<String, String> error = (JsonUtils.readValue(response, new TypeReference<Map<String, String>>() {}));
         String error_description = error.get("error_description");
         assertNotNull(error_description);
-        assertEquals("User password needs to be changed", error_description);
+        assertEquals("password change required", error_description);
 
     }
 
@@ -732,7 +739,7 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
             .accept(APPLICATION_JSON)
             .header(HOST, host)
             .contentType(APPLICATION_FORM_URLENCODED)
-            .param("grant_type", "urn:ietf:params:oauth:grant-type:saml2-bearer")
+            .param("grant_type", TokenConstants.GRANT_TYPE_SAML2_BEARER)
             .param("client_id", clientId)
             .param("client_secret", "secret")
             .param("assertion",assertion);
@@ -1045,12 +1052,10 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
                 .param(OAuth2Utils.REDIRECT_URI, TEST_REDIRECT_URI)
                 .param(ID_TOKEN_HINT_PROMPT, ID_TOKEN_HINT_PROMPT_NONE))
             .andExpect(status().isFound())
-            .andExpect(cookie().maxAge("Current-User", 0))
             .andReturn();
 
         String url = result.getResponse().getHeader("Location");
-        assertEquals(UaaUrlUtils.addQueryParameter(TEST_REDIRECT_URI, "error", "login_required"), url);
-
+        assertTrue(url.startsWith(UaaUrlUtils.addQueryParameter(TEST_REDIRECT_URI, "error", "login_required")));
     }
 
     @Test
@@ -3546,8 +3551,8 @@ public class TokenMvcMockTests extends AbstractTokenMockMvcTests {
             .param(OAuth2Utils.RESPONSE_TYPE, "token")
             .param(OAuth2Utils.GRANT_TYPE, "password")
             .param(OAuth2Utils.CLIENT_ID, clientId))
-            .andExpect(status().isForbidden())
-            .andExpect(content().string("{\"error\":\"access_denied\",\"error_description\":\"Your current password has expired. Please reset your password.\"}"));
+            .andExpect(status().isUnauthorized())
+            .andExpect(content().string("{\"error\":\"unauthorized\",\"error_description\":\"password change required\"}"));
     }
 
     @Test

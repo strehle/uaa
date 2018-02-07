@@ -7,11 +7,13 @@ import org.cloudfoundry.identity.uaa.zone.BrandingInformation;
 import org.cloudfoundry.identity.uaa.zone.BrandingInformation.Banner;
 import org.cloudfoundry.identity.uaa.zone.IdentityZone;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneConfiguration;
+import org.cloudfoundry.identity.uaa.zone.IdentityZoneSwitchingFilter;
 import org.cloudfoundry.identity.uaa.zone.JdbcIdentityZoneProvisioning;
 import org.cloudfoundry.identity.uaa.zone.SamlConfig;
 import org.junit.Before;
 import org.junit.Test;
 import org.springframework.http.HttpStatus;
+import org.springframework.restdocs.headers.HeaderDescriptor;
 import org.springframework.restdocs.payload.FieldDescriptor;
 import org.springframework.restdocs.snippet.Snippet;
 import org.springframework.security.oauth2.common.util.RandomValueStringGenerator;
@@ -53,9 +55,6 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
     private static final String NAME_DESC = "Human-readable zone name";
     private static final String DESCRIPTION_DESC = "Description of the zone";
     private static final String VERSION_DESC = "Reserved for future use of E-Tag versioning";
-    private static final String LOCKOUT_PERIOD_SECONDS_DESC = "Number of seconds to lock out an account when lockoutAfterFailures failures is exceeded (defaults to 300).";
-    private static final String LOCKOUT_AFTER_FAILURES_DESC = "Number of allowed failures before account is locked (defaults to 5).";
-    private static final String LOCKOUT_COUNT_FAILURES_WITHIN_DESC = "Number of seconds in which lockoutAfterFailures failures must occur in order for account to be locked (defaults to 3600).";
     private static final String TOKEN_POLICY_DESC = "Various fields pertaining to the JWT access and refresh tokens.";
     private static final String ACTIVE_KEY_ID_DESC = "The ID for the key that is being used to sign tokens";
     private static final String KEYS_UPDATE_DESC = "Keys which will be used to sign the token. If null value is specified for keys, then existing value will be retained.";
@@ -151,7 +150,10 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
     public static final String DEFAULT_ZONE_GROUPS_DESC = "Default groups each user in the zone inherits.";
     private static final String SERVICE_PROVIDER_ID = "cloudfoundry-saml-login";
     private static final String MFA_CONFIG_ENABLED_DESC = "Set `true` to enable Multi-factor Authentication (MFA) for the current zone. Defaults to `false`";
-    private static final String MFA_CONFIG_PROVIDER_ID_DESC = "The `id` of the MFA provider to use for this zone.";
+    private static final String MFA_CONFIG_PROVIDER_NAME_DESC = "The unique `name` of the MFA provider to use for this zone.";
+
+    private static final HeaderDescriptor IDENTITY_ZONE_ID_HEADER = headerWithName(IdentityZoneSwitchingFilter.HEADER).description("May include this header to administer another zone if using `zones.<zoneId>.admin` or `uaa.admin` scope against the default UAA zone.").optional();
+    private static final HeaderDescriptor IDENTITY_ZONE_SUBDOMAIN_HEADER = headerWithName(IdentityZoneSwitchingFilter.SUBDOMAIN_HEADER).optional().description("If using a `zones.<zoneId>.admin` scope/token, indicates what Identity Zone this request goes to by supplying a subdomain.");
 
     @Before
     public void setUp() throws Exception {
@@ -278,7 +280,7 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
             fieldWithPath("config.userConfig.defaultGroups").description(DEFAULT_ZONE_GROUPS_DESC).attributes(key("constraints").value("Optional")),
 
             fieldWithPath("config.mfaConfig.enabled").description(MFA_CONFIG_ENABLED_DESC).attributes(key("constraints").value("Optional")),
-            fieldWithPath("config.mfaConfig.providerId").description(MFA_CONFIG_PROVIDER_ID_DESC).attributes(key("constraints").value("Required when `config.mfaConfig.enabled` is `true`")).optional().type(STRING),
+            fieldWithPath("config.mfaConfig.providerName").description(MFA_CONFIG_PROVIDER_NAME_DESC).attributes(key("constraints").value("Required when `config.mfaConfig.enabled` is `true`")).optional().type(STRING),
 
             fieldWithPath("created").ignored(),
             fieldWithPath("last_modified").ignored()
@@ -294,7 +296,7 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
                   preprocessRequest(prettyPrint()),
                   preprocessResponse(prettyPrint()),
                   requestHeaders(
-                    headerWithName("Authorization").description("Bearer token containing `zones.write` or `zones.<zone id>.admin`")
+                    headerWithName("Authorization").description("Bearer token containing `zones.write` or `uaa.admin`")
                   ),
                   requestFields(fieldDescriptors),
                 getResponseFields()
@@ -321,7 +323,9 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
                     parameterWithName("id").description("Unique ID of the identity zone to retrieve")
                 ),
                 requestHeaders(
-                    headerWithName("Authorization").description("Bearer token containing `zones.read` or `zones.write` or `zones.<zone id>.admin` or `zones.<zone id>.read`")
+                    headerWithName("Authorization").description("Bearer token containing `zones.read` or `zones.write` or `uaa.admin`. If you use the zone-switching header, bear token containing `zones.<zone id>.admin` or `zones.<zone id>.read` can be used."),
+                    IDENTITY_ZONE_ID_HEADER,
+                    IDENTITY_ZONE_SUBDOMAIN_HEADER
                 ),
                 getResponseFields()
             ));
@@ -435,7 +439,7 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
             fieldWithPath("[].config.userConfig.defaultGroups").description(DEFAULT_ZONE_GROUPS_DESC).attributes(key("constraints").value("Optional")),
 
             fieldWithPath("[].config.mfaConfig.enabled").description(MFA_CONFIG_ENABLED_DESC).attributes(key("constraints").value("Optional")),
-            fieldWithPath("[].config.mfaConfig.providerId").description(MFA_CONFIG_PROVIDER_ID_DESC).attributes(key("constraints").value("Required when `config.mfaConfig.enabled` is `true`")).optional().type(STRING),
+            fieldWithPath("[].config.mfaConfig.providerName").description(MFA_CONFIG_PROVIDER_NAME_DESC).attributes(key("constraints").value("Required when `config.mfaConfig.enabled` is `true`")).optional().type(STRING),
 
                 fieldWithPath("[].created").ignored(),
             fieldWithPath("[].last_modified").ignored()
@@ -449,7 +453,9 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
             .andDo(document("{ClassName}/{methodName}",
                 preprocessResponse(prettyPrint()),
                 requestHeaders(
-                    headerWithName("Authorization").description("Bearer token containing `zones.read` or `zones.<zone id>.admin`")
+                    headerWithName("Authorization").description("Bearer token containing `zones.read` or `zones.write` or `uaa.admin`. If you use the zone-switching header, bear token containing `zones.<zone id>.admin` can be used."),
+                    IDENTITY_ZONE_ID_HEADER,
+                    IDENTITY_ZONE_SUBDOMAIN_HEADER
                 ),
                 responseFields
             ));
@@ -568,7 +574,7 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
             fieldWithPath("config.userConfig.defaultGroups").description(DEFAULT_ZONE_GROUPS_DESC).attributes(key("constraints").value("Optional")),
 
             fieldWithPath("config.mfaConfig.enabled").description(MFA_CONFIG_ENABLED_DESC).attributes(key("constraints").value("Optional")),
-            fieldWithPath("config.mfaConfig.providerId").description(MFA_CONFIG_PROVIDER_ID_DESC).attributes(key("constraints").value("Required when `config.mfaConfig.enabled` is `true`")).optional().type(STRING),
+            fieldWithPath("config.mfaConfig.providerName").description(MFA_CONFIG_PROVIDER_NAME_DESC).attributes(key("constraints").value("Required when `config.mfaConfig.enabled` is `true`")).optional().type(STRING),
 
             fieldWithPath("created").ignored(),
             fieldWithPath("last_modified").ignored()
@@ -587,7 +593,9 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
                     parameterWithName("id").description("Unique ID of the identity zone to update")
                 ),
                 requestHeaders(
-                    headerWithName("Authorization").description("Bearer token containing `zones.write` or `zones.<zone id>.admin`")
+                    headerWithName("Authorization").description("Bearer token containing `zones.write` or `uaa.admin`. If you use the zone-switching header, bear token containing `zones.<zone id>.admin` can be used."),
+                    IDENTITY_ZONE_ID_HEADER,
+                    IDENTITY_ZONE_SUBDOMAIN_HEADER
                 ),
                 requestFields,
                 getResponseFields()
@@ -615,7 +623,9 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
                     parameterWithName("id").description("Unique ID of the identity zone to delete")
                 ),
                 requestHeaders(
-                    headerWithName("Authorization").description("Bearer token containing `zones.write`")
+                    headerWithName("Authorization").description("Bearer token containing `zones.write` or `uaa.admin`. If you use the zone-switching header, bear token containing `zones.<zone id>.admin` can be used."),
+                    IDENTITY_ZONE_ID_HEADER,
+                    IDENTITY_ZONE_SUBDOMAIN_HEADER
                 ),
                 getResponseFields()
             ));
@@ -734,7 +744,7 @@ public class IdentityZoneEndpointDocs extends InjectedMockContextTest {
             fieldWithPath("config.userConfig.defaultGroups").description(DEFAULT_ZONE_GROUPS_DESC),
 
             fieldWithPath("config.mfaConfig.enabled").description(MFA_CONFIG_ENABLED_DESC),
-            fieldWithPath("config.mfaConfig.providerId").description(MFA_CONFIG_PROVIDER_ID_DESC).optional().type(STRING),
+            fieldWithPath("config.mfaConfig.providerName").description(MFA_CONFIG_PROVIDER_NAME_DESC).optional().type(STRING),
             fieldWithPath("created").ignored(),
             fieldWithPath("last_modified").ignored()
         );

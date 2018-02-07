@@ -12,75 +12,6 @@
  *******************************************************************************/
 package org.cloudfoundry.identity.uaa.login;
 
-import org.cloudfoundry.identity.uaa.authentication.UaaAuthentication;
-import org.cloudfoundry.identity.uaa.authentication.UaaPrincipal;
-import org.cloudfoundry.identity.uaa.codestore.ExpiringCode;
-import org.cloudfoundry.identity.uaa.codestore.ExpiringCodeStore;
-import org.cloudfoundry.identity.uaa.codestore.JdbcExpiringCodeStore;
-import org.cloudfoundry.identity.uaa.constants.OriginKeys;
-import org.cloudfoundry.identity.uaa.home.HomeController;
-import org.cloudfoundry.identity.uaa.mock.InjectedMockContextTest;
-import org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils;
-import org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils.IdentityZoneCreationResult;
-import org.cloudfoundry.identity.uaa.oauth.client.ClientConstants;
-import org.cloudfoundry.identity.uaa.provider.AbstractIdentityProviderDefinition;
-import org.cloudfoundry.identity.uaa.provider.AbstractXOAuthIdentityProviderDefinition;
-import org.cloudfoundry.identity.uaa.provider.IdentityProvider;
-import org.cloudfoundry.identity.uaa.provider.IdentityProviderProvisioning;
-import org.cloudfoundry.identity.uaa.provider.JdbcIdentityProviderProvisioning;
-import org.cloudfoundry.identity.uaa.provider.LdapIdentityProviderDefinition;
-import org.cloudfoundry.identity.uaa.provider.LockoutPolicy;
-import org.cloudfoundry.identity.uaa.provider.OIDCIdentityProviderDefinition;
-import org.cloudfoundry.identity.uaa.provider.SamlIdentityProviderDefinition;
-import org.cloudfoundry.identity.uaa.provider.UaaIdentityProviderDefinition;
-import org.cloudfoundry.identity.uaa.provider.saml.BootstrapSamlIdentityProviderConfiguratorTests;
-import org.cloudfoundry.identity.uaa.scim.ScimUser;
-import org.cloudfoundry.identity.uaa.scim.ScimUserProvisioning;
-import org.cloudfoundry.identity.uaa.scim.jdbc.JdbcScimUserProvisioning;
-import org.cloudfoundry.identity.uaa.security.web.CookieBasedCsrfTokenRepository;
-import org.cloudfoundry.identity.uaa.security.web.CorsFilter;
-import org.cloudfoundry.identity.uaa.user.UaaAuthority;
-import org.cloudfoundry.identity.uaa.util.JsonUtils;
-import org.cloudfoundry.identity.uaa.util.SetServerNameRequestPostProcessor;
-import org.cloudfoundry.identity.uaa.web.LimitedModeUaaFilter;
-import org.cloudfoundry.identity.uaa.zone.BrandingInformation;
-import org.cloudfoundry.identity.uaa.zone.IdentityZone;
-import org.cloudfoundry.identity.uaa.zone.IdentityZoneConfiguration;
-import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
-import org.cloudfoundry.identity.uaa.zone.IdentityZoneProvisioning;
-import org.cloudfoundry.identity.uaa.zone.Links;
-import org.cloudfoundry.identity.uaa.zone.MultitenancyFixture;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.mock.env.MockEnvironment;
-import org.springframework.mock.env.MockPropertySource;
-import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.mock.web.MockHttpSession;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.context.SecurityContextImpl;
-import org.springframework.security.crypto.codec.Base64;
-import org.springframework.security.oauth2.common.util.RandomValueStringGenerator;
-import org.springframework.security.oauth2.provider.client.BaseClientDetails;
-import org.springframework.security.web.PortResolverImpl;
-import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
-import org.springframework.security.web.csrf.CsrfToken;
-import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
-import org.springframework.security.web.savedrequest.DefaultSavedRequest;
-import org.springframework.security.web.savedrequest.SavedRequest;
-import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.test.web.servlet.ResultMatcher;
-import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
-import org.springframework.util.ReflectionUtils;
-import org.springframework.util.StringUtils;
-import org.springframework.web.context.support.XmlWebApplicationContext;
-
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpSession;
 import java.lang.reflect.Field;
@@ -107,6 +38,7 @@ import static java.util.Collections.singletonList;
 import static org.cloudfoundry.identity.uaa.constants.OriginKeys.LDAP;
 import static org.cloudfoundry.identity.uaa.constants.OriginKeys.UAA;
 import static org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils.CookieCsrfPostProcessor.cookieCsrf;
+import static org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils.constructGoogleMfaProvider;
 import static org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils.createOtherIdentityZone;
 import static org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils.getMarissaSecurityContext;
 import static org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils.getUaaSecurityContext;
@@ -135,7 +67,6 @@ import static org.mockito.Mockito.when;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.http.MediaType.TEXT_HTML;
 import static org.springframework.security.oauth2.common.util.OAuth2Utils.CLIENT_ID;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
@@ -151,6 +82,72 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.xpath;
+import org.cloudfoundry.identity.uaa.authentication.UaaAuthentication;
+import org.cloudfoundry.identity.uaa.authentication.UaaPrincipal;
+import org.cloudfoundry.identity.uaa.codestore.ExpiringCode;
+import org.cloudfoundry.identity.uaa.codestore.ExpiringCodeStore;
+import org.cloudfoundry.identity.uaa.codestore.JdbcExpiringCodeStore;
+import org.cloudfoundry.identity.uaa.constants.OriginKeys;
+import org.cloudfoundry.identity.uaa.home.HomeController;
+import org.cloudfoundry.identity.uaa.mfa.MfaProvider;
+import org.cloudfoundry.identity.uaa.mock.InjectedMockContextTest;
+import org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils;
+import org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils.IdentityZoneCreationResult;
+import org.cloudfoundry.identity.uaa.oauth.client.ClientConstants;
+import org.cloudfoundry.identity.uaa.provider.AbstractIdentityProviderDefinition;
+import org.cloudfoundry.identity.uaa.provider.AbstractXOAuthIdentityProviderDefinition;
+import org.cloudfoundry.identity.uaa.provider.IdentityProvider;
+import org.cloudfoundry.identity.uaa.provider.IdentityProviderProvisioning;
+import org.cloudfoundry.identity.uaa.provider.JdbcIdentityProviderProvisioning;
+import org.cloudfoundry.identity.uaa.provider.LdapIdentityProviderDefinition;
+import org.cloudfoundry.identity.uaa.provider.LockoutPolicy;
+import org.cloudfoundry.identity.uaa.provider.OIDCIdentityProviderDefinition;
+import org.cloudfoundry.identity.uaa.provider.SamlIdentityProviderDefinition;
+import org.cloudfoundry.identity.uaa.provider.UaaIdentityProviderDefinition;
+import org.cloudfoundry.identity.uaa.provider.saml.BootstrapSamlIdentityProviderDataTests;
+import org.cloudfoundry.identity.uaa.scim.ScimUser;
+import org.cloudfoundry.identity.uaa.scim.ScimUserProvisioning;
+import org.cloudfoundry.identity.uaa.scim.jdbc.JdbcScimUserProvisioning;
+import org.cloudfoundry.identity.uaa.security.web.CookieBasedCsrfTokenRepository;
+import org.cloudfoundry.identity.uaa.security.web.CorsFilter;
+import org.cloudfoundry.identity.uaa.user.UaaAuthority;
+import org.cloudfoundry.identity.uaa.util.JsonUtils;
+import org.cloudfoundry.identity.uaa.util.SetServerNameRequestPostProcessor;
+import org.cloudfoundry.identity.uaa.web.LimitedModeUaaFilter;
+import org.cloudfoundry.identity.uaa.zone.BrandingInformation;
+import org.cloudfoundry.identity.uaa.zone.IdentityZone;
+import org.cloudfoundry.identity.uaa.zone.IdentityZoneConfiguration;
+import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
+import org.cloudfoundry.identity.uaa.zone.IdentityZoneProvisioning;
+import org.cloudfoundry.identity.uaa.zone.Links;
+import org.cloudfoundry.identity.uaa.zone.MultitenancyFixture;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.mock.env.MockEnvironment;
+import org.springframework.mock.env.MockPropertySource;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextImpl;
+import org.springframework.security.crypto.codec.Base64;
+import org.springframework.security.oauth2.common.util.RandomValueStringGenerator;
+import org.springframework.security.oauth2.provider.client.BaseClientDetails;
+import org.springframework.security.web.PortResolverImpl;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.savedrequest.DefaultSavedRequest;
+import org.springframework.security.web.savedrequest.SavedRequest;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultMatcher;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.util.ReflectionUtils;
+import org.springframework.util.StringUtils;
+import org.springframework.web.context.support.XmlWebApplicationContext;
 
 public class LoginMockMvcTests extends InjectedMockContextTest {
 
@@ -169,6 +166,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
     private IdentityZoneConfiguration originalConfiguration;
     private IdentityZoneConfiguration identityZoneConfiguration;
     private Links globalLinks;
+    private IdentityZone identityZone;
 
 
     @Before
@@ -185,6 +183,25 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         adminToken = MockMvcUtils.getClientCredentialsOAuthAccessToken(getMockMvc(), "admin", "adminsecret", null, null);
         originalConfiguration = getWebApplicationContext().getBean(IdentityZoneProvisioning.class).retrieve(getUaa().getId()).getConfig();
         identityZoneConfiguration = getWebApplicationContext().getBean(IdentityZoneProvisioning.class).retrieve(getUaa().getId()).getConfig();
+        bootstrapMfaProvider();
+    }
+
+    private void bootstrapMfaProvider() throws Exception {
+        String subdomain = new RandomValueStringGenerator(24).generate().toLowerCase();
+        identityZone = MockMvcUtils.createOtherIdentityZone(subdomain, getMockMvc(), getWebApplicationContext(), false);
+
+        MfaProvider mfaProvider = constructGoogleMfaProvider();
+        mfaProvider = JsonUtils.readValue(getMockMvc().perform(
+            post("/mfa-providers")
+                .header("X-Identity-Zone-Id", identityZone.getId())
+                .header("Authorization", "Bearer " + adminToken)
+                .contentType(APPLICATION_JSON)
+                .content(JsonUtils.writeValueAsString(mfaProvider)))
+            .andExpect(status().isCreated())
+            .andReturn().getResponse().getContentAsByteArray(), MfaProvider.class);
+
+        identityZone.getConfig().getMfaConfig().setEnabled(true).setProviderName(mfaProvider.getName());
+        MockMvcUtils.updateIdentityZone(identityZone, getWebApplicationContext());
     }
 
     @After
@@ -209,6 +226,18 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
     }
 
     @Test
+    public void access_login_page_while_logged_in() throws Exception {
+        SecurityContext securityContext = MockMvcUtils.getMarissaSecurityContext(getWebApplicationContext());
+        getMockMvc().perform(
+            get("/login")
+                .header("Accept", MediaType.TEXT_HTML_VALUE)
+                .with(securityContext(securityContext))
+        )
+            .andExpect(status().isFound())
+            .andExpect(redirectedUrl("/home"));
+    }
+
+    @Test
     public void invalid_accept_media_type() throws Exception {
         getMockMvc().perform(
             get("/login")
@@ -226,6 +255,30 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
             .andExpect(model().attribute("links", hasEntry("createAccountLink", "/create_account")))
             .andExpect(model().attributeExists("prompts"))
             .andExpect(content().string(containsString("/create_account")));
+    }
+
+    @Test
+    public void testLoginMfaRedirect() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+
+        ScimUser user = createUser(identityZone.getId());
+
+        getMockMvc().perform(post("/login.do")
+                                 .with(cookieCsrf())
+                                 .with(new SetServerNameRequestPostProcessor(identityZone.getSubdomain() + ".localhost"))
+                                 .session(session)
+                                 .param("username", user.getUserName())
+                                 .param("password", user.getPassword()))
+            .andExpect(status().isFound())
+            .andExpect(redirectedUrl("/"));
+
+        getMockMvc().perform(get("/")
+                                 .with(cookieCsrf())
+                                 .with(new SetServerNameRequestPostProcessor(identityZone.getSubdomain() + ".localhost"))
+                                 .session(session))
+            .andExpect(status().isFound())
+            .andExpect(redirectedUrl("/login/mfa/register"));
+
     }
 
     public IdentityZone createZoneLinksZone() throws Exception {
@@ -408,8 +461,8 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
 
         getMockMvc().perform(invalidPost)
             .andDo(print())
-            .andExpect(status().isForbidden())
-            .andExpect(forwardedUrl("/login?error=invalid_login_request"));
+            .andExpect(status().isFound())
+            .andExpect(redirectedUrl("http://localhost/login?error=invalid_login_request"));
 
         session = new MockHttpSession();
         String csrfValue = "12345";
@@ -421,8 +474,8 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
                 .param(CookieBasedCsrfTokenRepository.DEFAULT_CSRF_COOKIE_NAME, "other-value")
         )
             .andDo(print())
-            .andExpect(status().isForbidden())
-            .andExpect(forwardedUrl("/login?error=invalid_login_request"));
+            .andExpect(status().isFound())
+            .andExpect(redirectedUrl("http://localhost/login?error=invalid_login_request"));
 
         ScimUser marissa = getWebApplicationContext().getBean(JdbcScimUserProvisioning.class).query("username eq 'marissa'", IdentityZoneHolder.get().getId()).get(0);
 
@@ -657,7 +710,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
             .andExpect(status().isOk())
             .andExpect(view().name("forgot_password"))
             .andExpect(content().string(containsString("action=\"/forgot_password.do\"")))
-            .andExpect(content().string(not(containsString("name=\"_csrf\""))));
+            .andExpect(content().string(not(containsString("name=\"X-Uaa-Csrf\""))));
     }
 
     @Test
@@ -666,7 +719,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         getMockMvc().perform(
             post("/forgot_password.do")
                 .param("username", "marissa")
-                .with(csrf().useInvalidToken()))
+                .with(cookieCsrf().useInvalidToken()))
             .andExpect(status().isFound())
             .andExpect(redirectedUrl("email_sent?code=reset_password"));
     }
@@ -680,7 +733,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
             .andExpect(status().isOk())
             .andExpect(view().name("change_password"))
             .andExpect(content().string(containsString("action=\"/change_password.do\"")))
-            .andExpect(content().string(containsString("name=\"_csrf\"")));
+            .andExpect(content().string(containsString("name=\"X-Uaa-Csrf\"")));
     }
 
     @Test
@@ -693,9 +746,9 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
                 .param("current_password", user.getPassword())
                 .param("new_password", "newSecr3t")
                 .param("confirm_password", "newSecr3t")
-                .with(csrf().useInvalidToken()))
-            .andExpect(status().isFound())
-            .andExpect(redirectedUrl("http://localhost/invalid_request"));
+                .with(cookieCsrf().useInvalidToken()))
+            .andExpect(status().isForbidden())
+            .andExpect(forwardedUrl("/invalid_request"));
 
         getMockMvc().perform(
             post("/change_password.do")
@@ -703,7 +756,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
                 .param("current_password", user.getPassword())
                 .param("new_password", "newSecr3t")
                 .param("confirm_password", "newSecr3t")
-                .with(csrf()))
+                .with(cookieCsrf()))
             .andExpect(status().isFound())
             .andExpect(redirectedUrl("profile"));
     }
@@ -1024,7 +1077,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         ScimUser marissa = userProvisioning.query("username eq \"marissa\" and origin eq \"uaa\"", IdentityZoneHolder.get().getId()).get(0);
         UaaPrincipal uaaPrincipal = new UaaPrincipal(marissa.getId(), marissa.getUserName(), marissa.getPrimaryEmail(), marissa.getOrigin(), marissa.getExternalId(), IdentityZoneHolder.get().getId());
 
-        UsernamePasswordAuthenticationToken principal = new UsernamePasswordAuthenticationToken(uaaPrincipal, null, asList(UaaAuthority.fromAuthorities("uaa.user")));
+        UaaAuthentication principal = new UaaAuthentication(uaaPrincipal, asList(UaaAuthority.fromAuthorities("uaa.user")), null);
         MockHttpSession session = new MockHttpSession();
         SecurityContext securityContext = new SecurityContextImpl();
         securityContext.setAuthentication(principal);
@@ -1559,7 +1612,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         String zoneAdminToken = identityZoneCreationResult.getZoneAdminToken();
 
         SamlIdentityProviderDefinition activeSamlIdentityProviderDefinition3 = new SamlIdentityProviderDefinition()
-            .setMetaDataLocation(String.format(BootstrapSamlIdentityProviderConfiguratorTests.xmlWithoutID, "http://example3.com/saml/metadata"))
+            .setMetaDataLocation(String.format(BootstrapSamlIdentityProviderDataTests.xmlWithoutID, "http://example3.com/saml/metadata"))
             .setIdpEntityAlias(alias3)
             .setLinkText("Active3 SAML Provider")
             .setZoneId(identityZone.getId());
@@ -1572,7 +1625,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         activeIdentityProvider3 = createIdentityProvider(identityZone, activeIdentityProvider3);
 
         SamlIdentityProviderDefinition activeSamlIdentityProviderDefinition2 = new SamlIdentityProviderDefinition()
-            .setMetaDataLocation(String.format(BootstrapSamlIdentityProviderConfiguratorTests.xmlWithoutID, "http://example2.com/saml/metadata"))
+            .setMetaDataLocation(String.format(BootstrapSamlIdentityProviderDataTests.xmlWithoutID, "http://example2.com/saml/metadata"))
             .setIdpEntityAlias(alias2)
             .setLinkText("Active2 SAML Provider")
             .setZoneId(identityZone.getId());
@@ -1675,7 +1728,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
             .with(securityContext(marissaContext));
         getMockMvc().perform(get)
             .andExpect(status().isOk())
-            .andExpect(content().string(containsString("_csrf")));
+            .andExpect(content().string(containsString("X-Uaa-Csrf")));
     }
 
     @Test
@@ -1688,19 +1741,19 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
             .with(securityContext(marissaContext));
         MockHttpSession session = (MockHttpSession) getMockMvc().perform(get)
             .andExpect(status().isOk())
-            .andExpect(content().string(containsString("_csrf")))
+            .andExpect(content().string(containsString("X-Uaa-Csrf")))
             .andReturn().getRequest().getSession();
-        assertNotNull(session.getAttribute(HttpSessionCsrfTokenRepository.class.getName().concat(".CSRF_TOKEN")));
 
         MockHttpServletRequestBuilder changeEmail = post("/change_email.do")
             .accept(TEXT_HTML)
             .session(session)
+            .with(cookieCsrf().useInvalidToken())
             .with(securityContext(marissaContext))
             .param("newEmail", "test@test.org")
             .param("client_id", "");
         getMockMvc().perform(changeEmail)
-            .andExpect(status().isFound())
-            .andExpect(redirectedUrl("http://localhost/invalid_request"));
+            .andExpect(status().isForbidden())
+            .andExpect(forwardedUrl("/invalid_request"));
     }
 
     @Test
@@ -1713,9 +1766,8 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
             .with(securityContext(marissaContext));
         MockHttpSession session = (MockHttpSession) getMockMvc().perform(get)
             .andExpect(status().isOk())
-            .andExpect(content().string(containsString("_csrf")))
+            .andExpect(content().string(containsString("X-Uaa-Csrf")))
             .andReturn().getRequest().getSession();
-        assertNotNull(session.getAttribute(HttpSessionCsrfTokenRepository.class.getName().concat(".CSRF_TOKEN")));
 
         MockHttpServletRequestBuilder changeEmail = post("/change_email.do")
             .accept(TEXT_HTML)
@@ -1723,10 +1775,10 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
             .with(securityContext(marissaContext))
             .param("newEmail", "test@test.org")
             .param("client_id", "")
-            .param("_csrf", "invalid csrf token");
+            .with(cookieCsrf().useInvalidToken());
         getMockMvc().perform(changeEmail)
-            .andExpect(status().isFound())
-            .andExpect(redirectedUrl("http://localhost/invalid_request"));
+            .andExpect(status().isForbidden())
+            .andExpect(forwardedUrl("/invalid_request"));
     }
 
     @Test
@@ -1737,7 +1789,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         MockHttpServletRequestBuilder changeEmail = post("/change_email.do")
             .accept(TEXT_HTML)
             .with(securityContext(marissaContext))
-            .with(csrf())
+            .with(cookieCsrf())
             .param("newEmail", "test@test.org")
             .param("client_id", "");
 
@@ -1759,19 +1811,18 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
 
         MvcResult result = getMockMvc().perform(get)
             .andExpect(status().isOk())
-            .andExpect(content().string(containsString("_csrf")))
+            .andExpect(content().string(containsString("X-Uaa-Csrf")))
             .andReturn();
 
         MockHttpSession session = (MockHttpSession)result.getRequest().getSession();
-        CsrfToken csrfToken = (CsrfToken)session.getAttribute(HttpSessionCsrfTokenRepository.class.getName().concat(".CSRF_TOKEN"));
 
         MockHttpServletRequestBuilder changeEmail = post("/change_email.do")
             .accept(TEXT_HTML)
             .with(securityContext(marissaContext))
+            .with(cookieCsrf())
             .session(session)
             .param("newEmail", "test@test.org")
-            .param("client_id", "")
-            .param("_csrf", csrfToken.getToken());
+            .param("client_id", "");
         getMockMvc().perform(changeEmail)
             .andExpect(status().isFound())
             .andExpect(redirectedUrl("email_sent?code=email_change"));
@@ -1785,25 +1836,25 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
 
         MockHttpServletRequestBuilder changeEmail = post("/change_email.do")
             .accept(TEXT_HTML)
-            .with(csrf());
+            .with(cookieCsrf());
         getMockMvc().perform(changeEmail)
             .andExpect(status().isFound())
             .andExpect(redirectedUrl("http://localhost/login"));
 
         changeEmail = post("/change_email.do")
             .accept(TEXT_HTML)
-            .with(csrf().useInvalidToken());
+            .with(cookieCsrf());
         getMockMvc().perform(changeEmail)
             .andExpect(status().isFound())
-            .andExpect(redirectedUrl("http://localhost/invalid_request"));
+            .andExpect(redirectedUrl("http://localhost/login"));
 
         changeEmail = post("/change_email.do")
             .accept(TEXT_HTML)
-            .with(csrf().useInvalidToken())
+            .with(cookieCsrf().useInvalidToken())
             .with(securityContext(marissaContext));
         getMockMvc().perform(changeEmail)
-            .andExpect(status().isFound())
-            .andExpect(redirectedUrl("http://localhost/invalid_request"));
+            .andExpect(status().isForbidden())
+            .andExpect(forwardedUrl("/invalid_request"));
     }
 
     @Test
@@ -1817,17 +1868,18 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
 
         getMockMvc().perform(get)
             .andExpect(status().isOk())
-            .andExpect(content().string(containsString("_csrf")))
+            .andExpect(content().string(containsString("X-Uaa-Csrf")))
             .andReturn();
 
         MockHttpServletRequestBuilder changeEmail = post("/change_email.do")
             .accept(TEXT_HTML)
             .with(securityContext(marissaContext))
+            .with(cookieCsrf().useInvalidToken())
             .param("newEmail", "test@test.org")
             .param("client_id", "");
         getMockMvc().perform(changeEmail)
-            .andExpect(status().isFound())
-            .andExpect(redirectedUrl("http://localhost/invalid_request"));
+            .andExpect(status().isForbidden())
+            .andExpect(forwardedUrl("/invalid_request"));
     }
 
 
@@ -1851,7 +1903,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         //logged in with valid CSRF
         MockHttpServletRequestBuilder post = post("/invitations/accept.do")
             .session(inviteSession)
-            .with(csrf())
+            .with(cookieCsrf())
             .param("code",code.getCode())
             .param("client_id", "random")
             .param("password", "password")
@@ -1865,14 +1917,14 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         //logged in, invalid CSRF
         post = post("/invitations/accept.do")
             .session(inviteSession)
-            .with(csrf().useInvalidToken())
+            .with(cookieCsrf().useInvalidToken())
             .param("client_id", "random")
             .param("password", "password")
             .param("password_confirmation", "yield_unprocessable_entity");
 
         getMockMvc().perform(post)
-            .andExpect(status().isFound())
-            .andExpect(redirectedUrl("http://localhost/invalid_request"));
+            .andExpect(status().isForbidden())
+            .andExpect(forwardedUrl("/invalid_request"));
 
         //not logged in, no CSRF
         post = post("/invitations/accept.do")
@@ -1882,12 +1934,12 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
 
         getMockMvc().perform(post)
             .andExpect(status().isFound())
-            .andExpect(redirectedUrl("http://localhost/invalid_request"));
+            .andExpect(redirectedUrl("http://localhost/login?error=invalid_login_request"));
 
 
         //not logged in, valid CSRF(can't happen)
         post = post("/invitations/accept.do")
-            .with(csrf())
+            .with(cookieCsrf())
             .param("client_id", "random")
             .param("password", "password")
             .param("code", "notvalidated")
@@ -2236,10 +2288,12 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         MockHttpSession session = setUpClientAndProviderForIdpDiscovery(originKey, zone);
 
         getMockMvc().perform(post("/login/idp_discovery")
+                                 .with(cookieCsrf())
             .header("Accept", TEXT_HTML)
             .session(session)
             .param("email", "marissa@test.org")
             .with(new SetServerNameRequestPostProcessor(zone.getSubdomain() + ".localhost")))
+            .andExpect(status().isFound())
             .andExpect(redirectedUrl("/saml/discovery?returnIDParam=idp&entityID=" + zone.getSubdomain() + ".cloudfoundry-saml-login&idp=" + originKey + "&isPassive=true"));
     }
 
@@ -2252,10 +2306,12 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         String originKey = createOIDCProvider(zone, "id_token code");
 
         getMockMvc().perform(post("/login/idp_discovery")
+                                 .with(cookieCsrf())
             .header("Accept", TEXT_HTML)
             .servletPath("/login/idp_discovery")
             .param("email", "marissa@test.org")
             .with(new SetServerNameRequestPostProcessor(zone.getSubdomain() + ".localhost")))
+            .andExpect(status().isFound())
             .andExpect(
                 header()
                     .string(
@@ -2325,10 +2381,12 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         MockHttpSession session = setUpClientAndProviderForIdpDiscovery(originKey, zone);
 
         getMockMvc().perform(post("/login/idp_discovery")
+                                 .with(cookieCsrf())
             .header("Accept", TEXT_HTML)
             .session(session)
             .param("email", "marissa@other.domain")
             .with(new SetServerNameRequestPostProcessor(zone.getSubdomain() + ".localhost")))
+            .andExpect(status().isFound())
             .andExpect(redirectedUrl("/login?discoveryPerformed=true&email=marissa%40other.domain"));
     }
 
@@ -2349,10 +2407,12 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         MockHttpSession session = setUpClientAndProviderForIdpDiscovery(originKey, zone);
 
         getMockMvc().perform(post("/login/idp_discovery")
+                                 .with(cookieCsrf())
             .header("Accept", TEXT_HTML)
             .session(session)
             .param("email", "marissa@test.org")
             .with(new SetServerNameRequestPostProcessor(zone.getSubdomain() + ".localhost")))
+            .andExpect(status().isFound())
             .andExpect(redirectedUrl("/login?discoveryPerformed=true&email=marissa%40test.org"));
     }
 
@@ -2367,6 +2427,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         MockHttpSession session = setUpClientAndProviderForIdpDiscovery(originKey, zone);
 
         getMockMvc().perform(post("/login/idp_discovery")
+                                 .with(cookieCsrf())
             .header("Accept", TEXT_HTML)
             .session(session)
             .param("email", "marissa@other.domain")
@@ -2392,10 +2453,12 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         MockHttpSession session = setUpClientAndProviderForIdpDiscovery(originKey, zone);
 
         getMockMvc().perform(post("/login/idp_discovery")
+                                 .with(cookieCsrf())
             .header("Accept", TEXT_HTML)
             .session(session)
             .param("email", "marissa@testLdap.org")
             .with(new SetServerNameRequestPostProcessor(zone.getSubdomain() + ".localhost")))
+            .andExpect(status().isFound())
             .andExpect(redirectedUrl("/login?discoveryPerformed=true&email=marissa%40testLdap.org"));
     }
 
@@ -2403,8 +2466,8 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
     public void passwordPageDisplayed_ifUaaIsFallbackIDPForEmailDomain() throws Exception {
         getMockMvc().perform(post("/login/idp_discovery")
             .header("Accept", TEXT_HTML)
+            .with(cookieCsrf())
             .param("email", "marissa@koala.com"))
-            .andExpect(status().isOk())
             .andExpect(view().name("idp_discovery/password"))
             .andExpect(xpath("//input[@name='password']").exists())
             .andExpect(xpath("//input[@name='username']/@value").string("marissa@koala.com"))
@@ -2417,6 +2480,7 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
         setSelfServiceLinksEnabled(false);
 
         getMockMvc().perform(post("/login/idp_discovery")
+                                 .with(cookieCsrf())
             .header("Accept", TEXT_HTML)
             .param("email", "marissa@koala.org"))
             .andExpect(status().isOk())
@@ -2426,10 +2490,9 @@ public class LoginMockMvcTests extends InjectedMockContextTest {
     @Test
     public void userNamePresentInPasswordPage() throws Exception {
         getMockMvc().perform(post("/login/idp_discovery")
-            .with(cookieCsrf())
+                                 .with(cookieCsrf())
             .param("email", "test@email.com"))
-            .andExpect(xpath("//input[@name='username']/@value").string("test@email.com"))
-            .andExpect(xpath("//input[@name='X-Uaa-Csrf']").exists());
+            .andExpect(xpath("//input[@name='username']/@value").string("test@email.com"));
     }
 
     @Test

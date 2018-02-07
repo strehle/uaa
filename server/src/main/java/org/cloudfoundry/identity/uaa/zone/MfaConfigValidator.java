@@ -2,8 +2,7 @@ package org.cloudfoundry.identity.uaa.zone;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.cloudfoundry.identity.uaa.mfa_provider.MfaProvider;
-import org.cloudfoundry.identity.uaa.mfa_provider.MfaProviderProvisioning;
+import org.cloudfoundry.identity.uaa.mfa.MfaProviderProvisioning;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.util.StringUtils;
 
@@ -19,17 +18,13 @@ public class MfaConfigValidator {
         this.mfaProviderProvisioning = mfaProviderProvisioning;
     }
 
-    public void validate(MfaConfig config) throws InvalidIdentityZoneConfigurationException {
-        if(config.isEnabled() || StringUtils.hasText(config.getProviderId())) {
+    public void validate(MfaConfig config, String zoneId) throws InvalidIdentityZoneConfigurationException {
+        if(config.isEnabled() || StringUtils.hasText(config.getProviderName())) {
             try {
-                MfaProvider existingProvider = mfaProviderProvisioning.retrieve(config.getProviderId(), IdentityZoneHolder.get().getId());
-                if(!existingProvider.isActive()) {
-                    logger.debug(String.format("Provider with id %s is not active.", config.getProviderId()));
-                    throw new InvalidIdentityZoneConfigurationException("Active MFA Provider not found for id: " + config.getProviderId());
-                }
+                mfaProviderProvisioning.retrieveByName(config.getProviderName(), zoneId);
             } catch(EmptyResultDataAccessException e){
-                logger.debug(String.format("Provider with id %s not found", config.getProviderId()));
-                throw new InvalidIdentityZoneConfigurationException("Active MFA Provider not found for id: " + config.getProviderId());
+                logger.debug(String.format("Provider with name %s not found", config.getProviderName()));
+                throw new InvalidIdentityZoneConfigurationException("Active MFA Provider not found with name: " + config.getProviderName());
             }
         }
     }

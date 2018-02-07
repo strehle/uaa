@@ -153,9 +153,8 @@
         <property name="clientDetailsService" ref="jdbcClientDetailsService"/>
         <property name="OAuth2RequestFactory" ref="authorizationRequestManager"/>
         <property name="hybridTokenGranterForAuthCode" ref="hybridTokenGranterForAuthCodeGrant"/>
-        <property name="redirectResolver">
-            <bean class="org.cloudfoundry.identity.uaa.oauth.AntPathRedirectResolver"/>
-        </property>
+        <property name="redirectResolver" ref="antPathRedirectResolver"/>
+        <property name="openIdSessionStateCalculator" ref="openIdSessionStateCalculator"/>
     </bean>
 
     <bean id="hybridTokenGranterForAuthCodeGrant" class="org.cloudfoundry.identity.uaa.oauth.HybridTokenGranterForAuthorizationCode">
@@ -353,24 +352,11 @@
         </property>
     </bean>
 
-    <bean id="promptOauthAuthorizeEntryPoint" class="org.cloudfoundry.identity.uaa.oauth.AuthorizePromptNoneEntryPoint">
-        <constructor-arg name="failureHandler">
-            <bean class="org.cloudfoundry.identity.uaa.login.UaaAuthenticationFailureHandler">
-                <constructor-arg name="delegate">
-                    <null/>
-                </constructor-arg>
-            </bean>
-        </constructor-arg>
-        <constructor-arg name="clientDetailsService" ref="jdbcClientDetailsService"/>
-        <constructor-arg name="redirectResolver">
-            <bean class="org.springframework.security.oauth2.provider.endpoint.DefaultRedirectResolver"/>
-        </constructor-arg>
-
-    </bean>
+    <bean id="antPathRedirectResolver" class="org.cloudfoundry.identity.uaa.oauth.AntPathRedirectResolver"/>
 
     <http name="promptStatelessTokenApiSecurity"
           disable-url-rewriting="true"
-          entry-point-ref="promptOauthAuthorizeEntryPoint"
+          entry-point-ref="uaaAuthorizationEndpoint"
           use-expressions="false"
           request-matcher-ref="promptOauthAuthorizeApiRequestMatcher"
           create-session="never"
@@ -572,15 +558,6 @@
                   value="${authentication.policy.global.lockoutPeriodSeconds:300}"/>
     </bean>
 
-    <bean id="defaultClientLockoutPolicy" class="org.cloudfoundry.identity.uaa.provider.LockoutPolicy">
-        <property name="lockoutAfterFailures"
-                  value="${authentication.policy.global.lockoutAfterFailures:-1}"/>
-        <property name="countFailuresWithin"
-                  value="${authentication.policy.global.countFailuresWithinSeconds:-1}"/>
-        <property name="lockoutPeriodSeconds"
-                  value="${authentication.policy.global.lockoutPeriodSeconds:-1}"/>
-    </bean>
-
     <bean id="globalUserLockoutPolicyRetriever" class="org.cloudfoundry.identity.uaa.authentication.manager.UserLockoutPolicyRetriever">
         <constructor-arg ref="identityProviderProvisioning"/>
         <property name="defaultLockoutPolicy" ref="defaultUserLockoutPolicy" />
@@ -602,6 +579,7 @@
     <bean id="uaaUserDatabaseAuthenticationManager"
           class="org.cloudfoundry.identity.uaa.authentication.manager.AuthzAuthenticationManager">
         <constructor-arg ref="userDatabase"/>
+        <constructor-arg ref="bcryptPasswordEncoder"/>
         <constructor-arg ref="identityProviderProvisioning"/>
         <property name="accountLoginPolicy" ref="globalPeriodLockoutPolicy"/>
         <property name="origin" value="uaa"/>

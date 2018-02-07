@@ -9,8 +9,8 @@ import org.cloudfoundry.identity.uaa.audit.event.AbstractUaaEvent;
 import org.cloudfoundry.identity.uaa.audit.event.EntityDeletedEvent;
 import org.cloudfoundry.identity.uaa.client.event.ClientCreateEvent;
 import org.cloudfoundry.identity.uaa.client.event.ClientDeleteEvent;
-import org.cloudfoundry.identity.uaa.mfa_provider.GoogleMfaProviderConfig;
-import org.cloudfoundry.identity.uaa.mfa_provider.MfaProvider;
+import org.cloudfoundry.identity.uaa.mfa.GoogleMfaProviderConfig;
+import org.cloudfoundry.identity.uaa.mfa.MfaProvider;
 import org.cloudfoundry.identity.uaa.mock.InjectedMockContextTest;
 import org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils;
 import org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils.IdentityZoneCreationResult;
@@ -1892,63 +1892,72 @@ public class IdentityZoneEndpointsMockMvcTests extends InjectedMockContextTest {
     }
 
     @Test
-    public void createZoneWithMfaConfig() throws Exception {
-        MfaProvider<GoogleMfaProviderConfig> mfaProvider = createGoogleMfaProvider();
+    public void createZoneWithMfaConfigIsNotSupported() throws Exception {
+        MfaProvider<GoogleMfaProviderConfig> mfaProvider = createGoogleMfaProvider(null);
         String zoneId = new RandomValueStringGenerator(5).generate();
-        String zoneContent = "{\"id\" : \""+zoneId+"\", \"name\" : \""+zoneId+"\", \"subdomain\" : \""+zoneId+"\", \"config\" : { \"mfaConfig\" : {\"enabled\" : true, \"providerId\" : \""+mfaProvider.getId()+"\"}}}";
-        MockHttpServletResponse response = getMockMvc().perform(post("/identity-zones")
-                .header("Authorization", "Bearer " + adminToken)
-                .contentType(APPLICATION_JSON)
-                .content(zoneContent))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse();
-
-        IdentityZone zoneCreated = JsonUtils.readValue(response.getContentAsString(), IdentityZone.class);
-        assertEquals(mfaProvider.getId(), zoneCreated.getConfig().getMfaConfig().getProviderId());
-        assertTrue(zoneCreated.getConfig().getMfaConfig().isEnabled());
-    }
-
-    @Test
-    public void createZoneWithInvalidMfaConfig() throws Exception {
-        MfaProvider<GoogleMfaProviderConfig> mfaProvider = createGoogleMfaProvider();
-        String zoneId = new RandomValueStringGenerator(5).generate();
-        String zoneContent = "{\"id\" : \""+zoneId+"\", \"name\" : \""+zoneId+"\", \"subdomain\" : \""+zoneId+"\", \"config\" : { \"mfaConfig\" : {\"enabled\" : true, \"providerId\" : \"INVALID_ID\"}}}";
+        String zoneContent = "{\"id\" : \""+zoneId+"\", \"name\" : \""+zoneId+"\", \"subdomain\" : \""+zoneId+"\", \"config\" : { \"mfaConfig\" : {\"enabled\" : true, \"providerName\" : \""+mfaProvider.getName()+"\"}}}";
         MockHttpServletResponse response = getMockMvc().perform(post("/identity-zones")
                 .header("Authorization", "Bearer " + adminToken)
                 .contentType(APPLICATION_JSON)
                 .content(zoneContent))
                 .andExpect(status().isUnprocessableEntity())
                 .andReturn().getResponse();
-
-        assertThat(response.getContentAsString(), containsString("Active MFA Provider not found for id: INVALID_ID"));
     }
 
     @Test
     public void updateZoneWithValidMfaConfig() throws Exception {
         IdentityZone identityZone = createZone(new RandomValueStringGenerator(5).generate(), HttpStatus.CREATED, adminToken, new IdentityZoneConfiguration());
-        MfaProvider<GoogleMfaProviderConfig> mfaProvider = createGoogleMfaProvider();
-        identityZone.getConfig().setMfaConfig(new MfaConfig().setProviderId(mfaProvider.getId()));
+        MfaProvider<GoogleMfaProviderConfig> mfaProvider = createGoogleMfaProvider(identityZone.getId());
+        identityZone.getConfig().setMfaConfig(new MfaConfig().setProviderName(mfaProvider.getName()));
 
         IdentityZone updatedZone = updateZone(identityZone, HttpStatus.OK, adminToken);
 
-        assertEquals(mfaProvider.getId(), updatedZone.getConfig().getMfaConfig().getProviderId());
+        assertEquals(mfaProvider.getName(), updatedZone.getConfig().getMfaConfig().getProviderName());
         assertFalse(updatedZone.getConfig().getMfaConfig().isEnabled());
+    }
+
+    @Test
+    public void updateZoneWithValidMfaConfigWithoutIdInBody_Succeeds() throws Exception {
+        IdentityZone identityZone = createZone(new RandomValueStringGenerator(5).generate(), HttpStatus.CREATED, adminToken, new IdentityZoneConfiguration());
+        MfaProvider<GoogleMfaProviderConfig> mfaProvider = createGoogleMfaProvider(identityZone.getId());
+        identityZone.getConfig().setMfaConfig(new MfaConfig().setEnabled(true).setProviderName(mfaProvider.getName()));
+        String id = identityZone.getId();
+        identityZone.setId(null);
+
+        IdentityZone updatedZone = updateZone(id, identityZone, HttpStatus.OK, adminToken);
+
+        assertEquals(mfaProvider.getName(), updatedZone.getConfig().getMfaConfig().getProviderName());
+        assertTrue(updatedZone.getConfig().getMfaConfig().isEnabled());
+    }
+
+    @Test
+    public void updateZoneWithDifferentIdInBodyAndPath_fails() throws Exception {
+        IdentityZone identityZone = createZone(new RandomValueStringGenerator(5).generate(), HttpStatus.CREATED, adminToken, new IdentityZoneConfiguration());
+        String id = identityZone.getId();
+        IdentityZone identityZone2 = createZone(new RandomValueStringGenerator(5).generate(), HttpStatus.CREATED, adminToken, new IdentityZoneConfiguration());
+        identityZone.setId(identityZone2.getId());
+
+        updateZone(id, identityZone, HttpStatus.UNPROCESSABLE_ENTITY, adminToken);
     }
 
     @Test
     public void updateZoneWithInvalidMfaConfig() throws Exception {
         IdentityZone identityZone = createZone(new RandomValueStringGenerator(5).generate(), HttpStatus.CREATED, adminToken, new IdentityZoneConfiguration());
-        identityZone.getConfig().setMfaConfig(new MfaConfig().setProviderId("INVALID_ID"));
+        identityZone.getConfig().setMfaConfig(new MfaConfig().setProviderName("INVALID_NAME"));
 
         updateZone(identityZone, HttpStatus.UNPROCESSABLE_ENTITY, adminToken);
     }
 
-    private MfaProvider<GoogleMfaProviderConfig> createGoogleMfaProvider() throws Exception {
+    private MfaProvider<GoogleMfaProviderConfig> createGoogleMfaProvider(String zoneId) throws Exception {
         MfaProvider<GoogleMfaProviderConfig> mfaProvider = new MfaProvider().setName(new RandomValueStringGenerator(5).generate());
-        MockHttpServletResponse mfaProviderResponse = getMockMvc().perform(post("/mfa-providers")
+        MockHttpServletRequestBuilder createMfaRequest = post("/mfa-providers")
                 .header("Authorization", "Bearer " + adminToken)
                 .contentType(APPLICATION_JSON)
-                .content(JsonUtils.writeValueAsString(mfaProvider))).andReturn().getResponse();
+                .content(JsonUtils.writeValueAsString(mfaProvider));
+        if(hasText(zoneId)){
+            createMfaRequest.header("X-Identity-Zone-Id", zoneId);
+        }
+        MockHttpServletResponse mfaProviderResponse = getMockMvc().perform(createMfaRequest).andReturn().getResponse();
         mfaProvider = JsonUtils.readValue(mfaProviderResponse.getContentAsString(), MfaProvider.class);
         return mfaProvider;
     }
@@ -1991,19 +2000,23 @@ public class IdentityZoneEndpointsMockMvcTests extends InjectedMockContextTest {
         return null;
     }
 
-    private IdentityZone updateZone(IdentityZone identityZone, HttpStatus expect, String token) throws Exception {
+    private IdentityZone updateZone(String id, IdentityZone identityZone, HttpStatus expect, String token) throws Exception {
         MvcResult result = getMockMvc().perform(
-            put("/identity-zones/" + identityZone.getId())
-                .header("Authorization", "Bearer " + token)
-                .contentType(APPLICATION_JSON)
-                .content(JsonUtils.writeValueAsString(identityZone)))
-            .andExpect(status().is(expect.value()))
-            .andReturn();
+                put("/identity-zones/" + id)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(APPLICATION_JSON)
+                        .content(JsonUtils.writeValueAsString(identityZone)))
+                .andExpect(status().is(expect.value()))
+                .andReturn();
 
         if (expect.is2xxSuccessful()) {
             return JsonUtils.readValue(result.getResponse().getContentAsString(), IdentityZone.class);
         }
         return null;
+    }
+
+    private IdentityZone updateZone(IdentityZone identityZone, HttpStatus expect, String token) throws Exception {
+        return updateZone(identityZone.getId(), identityZone, expect, token);
     }
 
     private <T extends AbstractUaaEvent> void checkZoneAuditEventInUaa(int eventCount, AuditEventType eventType) {

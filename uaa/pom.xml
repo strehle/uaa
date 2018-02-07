@@ -2,7 +2,7 @@
 <project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <parent>
-     <version>4.8.0-SNAPSHOT</version>
+     <version>4.11.0-SNAPSHOT</version>
      <groupId>org.cloudfoundry.identity</groupId>
      <artifactId>cloudfoundry-identity-parent</artifactId>
   </parent>
@@ -10,7 +10,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.cloudfoundry.identity</groupId>
   <artifactId>cloudfoundry-identity-uaa</artifactId>
-  <version>4.8.0-SNAPSHOT</version>
+  <version>4.11.0-SNAPSHOT</version>
   <packaging>war</packaging>
   <properties>
     <maven.test.skip>true</maven.test.skip>
@@ -58,7 +58,7 @@
     <dependency>
       <groupId>org.cloudfoundry.identity</groupId>
       <artifactId>cloudfoundry-identity-server</artifactId>
-      <version>4.8.0-SNAPSHOT</version>
+      <version>4.11.0-SNAPSHOT</version>
       <scope>compile</scope>
       <exclusions>
         <exclusion>
@@ -70,43 +70,37 @@
     <dependency>
       <groupId>cglib</groupId>
       <artifactId>cglib</artifactId>
-      <version>2.2.2</version>
+      <version>3.2.5</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.springframework.security</groupId>
       <artifactId>spring-security-config</artifactId>
-      <version>4.2.3.RELEASE</version>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.springframework.security</groupId>
-      <artifactId>spring-security-jwt</artifactId>
-      <version>1.0.8.RELEASE</version>
+      <version>4.2.4.RELEASE</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.springframework.retry</groupId>
       <artifactId>spring-retry</artifactId>
-      <version>1.1.5.RELEASE</version>
+      <version>1.2.1.RELEASE</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.aspectj</groupId>
       <artifactId>aspectjweaver</artifactId>
-      <version>1.6.9</version>
+      <version>1.8.12</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.0.0</version>
+      <version>42.1.4</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-test</artifactId>
-      <version>4.3.11.RELEASE</version>
+      <version>4.3.14.RELEASE</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -130,7 +124,7 @@
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
-      <version>2.7.19</version>
+      <version>2.8.47</version>
       <scope>test</scope>
       <exclusions>
         <exclusion>
@@ -142,13 +136,13 @@
     <dependency>
       <groupId>org.flywaydb</groupId>
       <artifactId>flyway-core</artifactId>
-      <version>4.0</version>
+      <version>4.2.0</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>com.microsoft.sqlserver</groupId>
       <artifactId>mssql-jdbc</artifactId>
-      <version>6.1.0.jre8</version>
+      <version>6.2.2.jre8</version>
       <scope>test</scope>
       <exclusions>
         <exclusion>
@@ -156,6 +150,18 @@
           <groupId>com.microsoft.azure</groupId>
         </exclusion>
       </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.powermock</groupId>
+      <artifactId>powermock-module-junit4</artifactId>
+      <version>1.7.0</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.powermock</groupId>
+      <artifactId>powermock-api-mockito2</artifactId>
+      <version>1.7.0</version>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.tomcat</groupId>
@@ -166,7 +172,7 @@
     <dependency>
       <groupId>com.jayway.jsonpath</groupId>
       <artifactId>json-path-assert</artifactId>
-      <version>2.2.0</version>
+      <version>2.4.0</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -234,6 +240,12 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>com.google.zxing</groupId>
+      <artifactId>core</artifactId>
+      <version>3.3.1</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.reflections</groupId>
       <artifactId>reflections</artifactId>
       <version>0.9.10</version>
@@ -248,7 +260,7 @@
     <dependency>
       <groupId>org.springframework.security</groupId>
       <artifactId>spring-security-test</artifactId>
-      <version>4.2.3.RELEASE</version>
+      <version>4.2.4.RELEASE</version>
       <scope>test</scope>
     </dependency>
     <dependency>
