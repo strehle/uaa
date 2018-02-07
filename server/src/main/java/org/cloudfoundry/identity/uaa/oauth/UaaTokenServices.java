@@ -890,9 +890,11 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
         ExpiringOAuth2RefreshToken token = new DefaultExpiringOAuth2RefreshToken(tokenId,
                                                                                  new Date(System.currentTimeMillis() + (validitySeconds * 1000L)));
 
-        Map<String,String> externalAttributes = null;
+        Map<String,Object> externalAttributes = null;
         if (uaaTokenEnhancer != null) {
-            externalAttributes = uaaTokenEnhancer.getExternalAttributes(authentication);
+            externalAttributes = new HashMap<>();
+            externalAttributes.putAll(uaaTokenEnhancer.enhance(emptyMap(), authentication));
+            //externalAttributes = uaaTokenEnhancer.getExternalAttributes(authentication);
         }
 
         String content;
@@ -936,7 +938,7 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
         Set<String> resourceIds,
         String revocableSignature,
         boolean revocable,
-        Map<String, String> externalAttributes) {
+        Map<String, Object> externalAttributes) {
 
         Map<String, Object> response = new LinkedHashMap<String, Object>();
 
@@ -947,7 +949,7 @@ public class UaaTokenServices implements AuthorizationServerTokenServices, Resou
             response.put(ADDITIONAL_AZ_ATTR, additionalAuthorizationAttributes);
         }
         if (null != externalAttributes) {
-            response.put(EXTERNAL_ATTR, externalAttributes);
+            response.putAll(externalAttributes);
         }
 
         response.put(IAT, System.currentTimeMillis() / 1000);
