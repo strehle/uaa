@@ -23,8 +23,11 @@ import org.cloudfoundry.identity.uaa.mock.InjectedMockContextTest;
 import org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils;
 import org.cloudfoundry.identity.uaa.scim.ScimUser;
 import org.cloudfoundry.identity.uaa.util.JsonUtils;
+import org.cloudfoundry.identity.uaa.util.SetServerNameRequestPostProcessor;
 import org.cloudfoundry.identity.uaa.zone.IdentityZone;
+import org.cloudfoundry.identity.uaa.zone.IdentityZoneConfiguration;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
+import org.cloudfoundry.identity.uaa.zone.IdentityZoneProvisioning;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -43,6 +46,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils.CookieCsrfPostProcessor.cookieCsrf;
+import static org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils.createOtherIdentityZone;
 import static org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils.utils;
 import static org.cloudfoundry.identity.uaa.zone.IdentityZoneSwitchingFilter.HEADER;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -162,8 +166,22 @@ public class PasswordResetEndpointMockMvcTests extends InjectedMockContextTest {
         assertEquals("redirect.example.com", resultingCodeData.get("redirect_uri"));
     }
 
+
+    private IdentityZone setupZone(IdentityZoneConfiguration config) throws Exception {
+        String zoneId = generator.generate().toLowerCase();
+        IdentityZone zone = createOtherIdentityZone(zoneId, getMockMvc(), getWebApplicationContext(), false);
+        zone.setConfig(config);
+        getWebApplicationContext().getBean(IdentityZoneProvisioning.class).update(zone);
+        return zone;
+    }
+
     @Test
     public void changePassword_do_with_clientid_and_redirecturi() throws Exception {
+        IdentityZoneConfiguration config = new IdentityZoneConfiguration();
+        config.setIdpDiscoveryEnabled(true);
+        IdentityZone identityZone = setupZone(config);
+
+        IdentityZoneHolder.get().getConfig().setIdpDiscoveryEnabled(true);
         String code = getExpiringCode("app", "http://localhost:8080/app/");
         String email = user.getUserName();
 
@@ -197,8 +215,7 @@ public class PasswordResetEndpointMockMvcTests extends InjectedMockContextTest {
 
         getMockMvc().perform(post)
             .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("http://localhost:8080/app/"))
-            .andExpect(savedAccountCookie(user));
+            .andExpect(redirectedUrl("http://localhost:8080/app/"));
     }
 
     @SuppressWarnings("deprecation")

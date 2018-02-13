@@ -466,6 +466,12 @@ public final class MockMvcUtils {
         setZoneConfiguration(context, zoneId, config);
     }
 
+    public static void setIdpDiscoveryEnabled(ApplicationContext context, String zoneId, boolean enabled) {
+        IdentityZoneConfiguration config = getZoneConfiguration(context, zoneId);
+        config.setIdpDiscoveryEnabled(enabled);
+        setZoneConfiguration(context, zoneId, config);
+    }
+
     public static void setZoneConfiguration(ApplicationContext context, String zoneId, IdentityZoneConfiguration configuration) {
         IdentityZoneProvisioning provisioning = context.getBean(IdentityZoneProvisioning.class);
         IdentityZone uaaZone = provisioning.retrieve(zoneId);
