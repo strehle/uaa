@@ -23,9 +23,7 @@ jobs:
       - name: Build the Docker image    
         run: ./gradlew --no-daemon --max-workers 1 bootBuildImage --imageName ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.repository }}:${{ github.run_number }} 
       - name: Tag image
-        run: >-
-          docker tag strehle/${{ github.repository }}:latest
-          strehle/${{ github.repository }}:${{ github.run_number }}
+        run: docker tag strehle/${{ github.repository }}:${{ github.run_number }} strehle/${{ github.repository }}:latest
       - name: Push Docker image
         if: ${{ github.event_name != 'pull_request' }}
         run: >-
