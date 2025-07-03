@@ -26,7 +26,11 @@ jobs:
       - name: Tag image
         run: docker tag strehle/${{ github.repository }}:${{ github.run_number }} strehle/${{ github.repository }}:latest
       - name: Push Docker image
-        if: ${{ github.event_name != 'pull_request' }}
-        run: >-
-          docker push strehle/${{ github.repository }}:${{ github.run_number }}
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: strehle/${{ github.repository }}:${{ github.run_number }}
+#        if: ${{ github.event_name != 'pull_request' }}
+#        run: >-
+#          docker push strehle/${{ github.repository }}:${{ github.run_number }}
 #          docker push strehle/${{ github.repository }}:latest &&
