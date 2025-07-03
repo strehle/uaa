@@ -23,7 +23,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build the Docker image    
         run:  >-
-          docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+          docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }} &&
           ./gradlew --no-daemon --max-workers 1 bootBuildImage --imageName ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.repository }}:${{ github.run_number }} --publishImage
 #      - name: Tag image
 #        run: docker tag strehle/${{ github.repository }}:${{ github.run_number }} strehle/${{ github.repository }}:latest
