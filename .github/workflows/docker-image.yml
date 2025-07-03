@@ -23,7 +23,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build the Docker image   
         run:
-         env BP_JVM_TYPE=JDK ./gradlew --no-daemon --max-workers 1 bootBuildImage --imageName docker.io/strehle/uaa:${{ github.run_number }} --publishImage
+         export BP_JVM_TYPE=JDK && ./gradlew --no-daemon --max-workers 1 bootBuildImage --imageName docker.io/strehle/uaa:${{ github.run_number }} --publishImage
 #         ./gradlew --no-daemon --max-workers 1 bootBuildImage --imageName docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ github.repository }}:${{ github.run_number }} --publishImage
 #      - name: Build the Docker image
 #        run:  >-
