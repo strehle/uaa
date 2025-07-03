@@ -1,0 +1,33 @@
+name: Docker Image CI
+
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'liberica'
+          java-version: '21'
+          check-latest: false
+          cache: 'gradle'
+      - name: Build the Docker image    
+        run: ./gradlew bootBuildImage  --imageName strehle/${{ github.repository }}
+      - name: Tag image
+        run: >-
+          docker tag strehle/${{ github.repository }}:latest
+          strehle/${{ github.repository }}:${{ github.run_number }}
+      - name: Docker Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Push Docker image
+        if: ${{ github.event_name != 'pull_request' }}
+        run: >-
+          docker push strehle/${{ github.repository }}:latest &&
+          docker push strehle/${{ github.repository }}:${{ github.run_number }}
