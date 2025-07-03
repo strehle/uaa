@@ -21,6 +21,10 @@ jobs:
           registry: docker.io
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Git command
+        run: |
+         git tag
+         git tag | sort --version-sort | tail -n1 |cut -c2-
       - name: Build the Docker image   
         run:
          export BP_JVM_TYPE=JDK && ./gradlew --no-daemon --max-workers 1 bootBuildImage --imageName docker.io/strehle/uaa:${{ github.run_number }} --publishImage
