@@ -28,5 +28,5 @@ jobs:
       - name: Push Docker image
         if: ${{ github.event_name != 'pull_request' }}
         run: >-
-          docker push strehle/${{ github.repository }}:latest &&
           docker push strehle/${{ github.repository }}:${{ github.run_number }}
+#          docker push strehle/${{ github.repository }}:latest &&
