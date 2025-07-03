@@ -23,7 +23,8 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build the Docker image   
         run:
-         ./gradlew --no-daemon --max-workers 1 bootBuildImage --imageName docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ github.repository }}:${{ github.run_number }} --publishImage
+         ./gradlew --no-daemon --max-workers 1 bootBuildImage --imageName docker.io/strehle/uaa:${{ github.run_number }} --publishImage
+#         ./gradlew --no-daemon --max-workers 1 bootBuildImage --imageName docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ github.repository }}:${{ github.run_number }} --publishImage
 #      - name: Build the Docker image
 #        run:  >-
 #          docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }} &&
