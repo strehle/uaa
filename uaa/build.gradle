@@ -203,11 +203,12 @@ tasks.named('bootBuildImage') {
         activeSpringProfiles.contains("debug") || Boolean.valueOf(System.getProperty("xdebug"))) {
         doDebug = true
     }
+    // https://github.com/paketo-buildpacks/bellsoft-liberica
     bootBuildImage.environment = [
             'BP_SPRING_CLOUD_BINDINGS_DISABLED': 'true',
-            'BP_JVM_VERSION' : '21',
-            'BP_JVM_TYPE'    : 'JDK',
-            'BP_JVM_PLATFORM': 'liberica'
+            'BP_JVM_VERSION'                   : '21',
+            'BP_JVM_TYPE'                      : 'JDK',
+            'BP_JVM_PLATFORM'                  : 'bellsoft-liberica'
     ]
     if (doDebug) {
         bootBuildImage.environment.put("BPL_DEBUG_ENABLED", "true")
