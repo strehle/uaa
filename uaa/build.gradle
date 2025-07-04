@@ -204,11 +204,12 @@ tasks.named('bootBuildImage') {
         doDebug = true
     }
     // https://github.com/paketo-buildpacks/bellsoft-liberica
+    // use JRE since JDK gets too big
     bootBuildImage.environment = [
             'BP_SPRING_CLOUD_BINDINGS_DISABLED': 'true',
             'BP_JVM_VERSION'                   : '21',
-            'BP_JVM_TYPE'                      : 'JDK',
-            'BP_JVM_PLATFORM'                  : 'bellsoft-liberica'
+            'BP_JVM_TYPE'                      : 'JRE',
+            'BP_JVM_PLATFORM'                  : 'liberica'
     ]
     if (doDebug) {
         bootBuildImage.environment.put("BPL_DEBUG_ENABLED", "true")
